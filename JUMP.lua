@@ -1,22 +1,23 @@
--- FUSION BRAINROT JUMP V2
--- Delta Android | Carry Mode
--- Jump Power: 100
+-- FUSION BRAINROT JUMP V3
+-- CARRY CONTROL | DELTA ANDROID
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 
-local POWER = 100
 local Enabled = false
-local Humanoid
-local Connections = {}
-local Original = {}
+local Power = 55
+local Height = 8.5
 
-local function DisconnectAll()
-    for _, connection in ipairs(Connections) do
-        connection:Disconnect()
+local Humanoid
+local Original = {}
+local CharacterConnections = {}
+
+local function DisconnectCharacter()
+    for _, c in ipairs(CharacterConnections) do
+        c:Disconnect()
     end
-    table.clear(Connections)
+    table.clear(CharacterConnections)
 end
 
 local function ApplyJump()
@@ -25,28 +26,24 @@ local function ApplyJump()
     end
 
     if Humanoid.UseJumpPower then
-        if Humanoid.JumpPower ~= POWER then
-            Humanoid.JumpPower = POWER
+        if Humanoid.JumpPower ~= Power then
+            Humanoid.JumpPower = Power
         end
     else
-        if Humanoid.JumpHeight ~= POWER then
-            Humanoid.JumpHeight = POWER
+        if Humanoid.JumpHeight ~= Height then
+            Humanoid.JumpHeight = Height
         end
     end
-
-    Humanoid:SetStateEnabled(
-        Enum.HumanoidStateType.Jumping, true
-    )
 end
 
-local function Restore()
+local function RestoreJump()
     if not Humanoid then return end
 
-    if Original.JumpPower then
+    if Original.JumpPower ~= nil then
         Humanoid.JumpPower = Original.JumpPower
     end
 
-    if Original.JumpHeight then
+    if Original.JumpHeight ~= nil then
         Humanoid.JumpHeight = Original.JumpHeight
     end
 
@@ -58,10 +55,142 @@ local function Restore()
     end
 end
 
-local function SetupCharacter(Character)
-    DisconnectAll()
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "FusionBrainrotJumpV3"
+Gui.ResetOnSpawn = false
 
-    Humanoid = Character:WaitForChild("Humanoid")
+local ok = pcall(function()
+    Gui.Parent = game:GetService("CoreGui")
+end)
+
+if not ok or not Gui.Parent then
+    Gui.Parent = Player:WaitForChild("PlayerGui")
+end
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.fromOffset(255, 205)
+Main.Position = UDim2.new(0.5, -127, 0.4, 0)
+Main.BackgroundColor3 = Color3.fromRGB(17, 19, 27)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Parent = Gui
+
+Instance.new("UICorner", Main).CornerRadius =
+    UDim.new(0, 14)
+
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = Color3.fromRGB(0, 180, 255)
+Stroke.Thickness = 2
+
+local function Label(name, text, position, size)
+    local obj = Instance.new("TextLabel")
+    obj.Name = name
+    obj.Position = position
+    obj.Size = size
+    obj.BackgroundTransparency = 1
+    obj.Text = text
+    obj.TextColor3 = Color3.new(1, 1, 1)
+    obj.Font = Enum.Font.GothamBold
+    obj.TextSize = 13
+    obj.Parent = Main
+    return obj
+end
+
+Label("Title", "FUSION BRAINROT JUMP V3",
+    UDim2.fromOffset(0, 8), UDim2.new(1, 0, 0, 30)
+).TextColor3 = Color3.fromRGB(0, 190, 255)
+
+local Status = Label("Status", "STATUS: OFF",
+    UDim2.fromOffset(0, 40), UDim2.new(1, 0, 0, 25)
+)
+
+Status.TextColor3 = Color3.fromRGB(255, 90, 90)
+
+local Value = Label("Value", "POWER: 55",
+    UDim2.fromOffset(0, 76), UDim2.new(1, 0, 0, 25)
+)
+
+local function Button(name, text, pos, size)
+    local b = Instance.new("TextButton")
+    b.Name = name
+    b.Position = pos
+    b.Size = size
+    b.BackgroundColor3 = Color3.fromRGB(0, 105, 175)
+    b.Text = text
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 17
+    b.Parent = Main
+    Instance.new("UICorner", b).CornerRadius =
+        UDim.new(0, 8)
+    return b
+end
+
+local Minus = Button("Minus", "-",
+    UDim2.fromOffset(30, 108),
+    UDim2.fromOffset(55, 35)
+)
+
+local Plus = Button("Plus", "+",
+    UDim2.fromOffset(170, 108),
+    UDim2.fromOffset(55, 35)
+)
+
+local Toggle = Button("Toggle", "ACTIVAR",
+    UDim2.fromOffset(30, 153),
+    UDim2.fromOffset(195, 38)
+)
+
+local function UpdateValue()
+    if Humanoid and Humanoid.UseJumpPower then
+        Value.Text = "JUMP POWER: " .. Power
+    else
+        Value.Text = "JUMP HEIGHT: " .. Height
+    end
+
+    ApplyJump()
+end
+
+Minus.MouseButton1Click:Connect(function()
+    if Humanoid and Humanoid.UseJumpPower then
+        Power = math.max(40, Power - 2)
+    else
+        Height = math.max(7, Height - 0.5)
+    end
+
+    UpdateValue()
+end)
+
+Plus.MouseButton1Click:Connect(function()
+    if Humanoid and Humanoid.UseJumpPower then
+        Power = math.min(65, Power + 2)
+    else
+        Height = math.min(11, Height + 0.5)
+    end
+
+    UpdateValue()
+end)
+
+Toggle.MouseButton1Click:Connect(function()
+    Enabled = not Enabled
+
+    if Enabled then
+        ApplyJump()
+        Status.Text = "STATUS: ON"
+        Status.TextColor3 = Color3.fromRGB(0, 255, 130)
+        Toggle.Text = "DESACTIVAR"
+    else
+        RestoreJump()
+        Status.Text = "STATUS: OFF"
+        Status.TextColor3 = Color3.fromRGB(255, 90, 90)
+        Toggle.Text = "ACTIVAR"
+    end
+end)
+
+local function SetupCharacter(char)
+    DisconnectCharacter()
+
+    Humanoid = char:WaitForChild("Humanoid")
 
     Original = {
         JumpPower = Humanoid.JumpPower,
@@ -75,125 +204,40 @@ local function SetupCharacter(Character)
         ApplyJump()
     end
 
-    table.insert(Connections,
+    table.insert(CharacterConnections,
         Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(
-            ApplyJump
+            function()
+                if Enabled then ApplyJump() end
+            end
         )
     )
 
-    table.insert(Connections,
+    table.insert(CharacterConnections,
         Humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(
-            ApplyJump
+            function()
+                if Enabled then ApplyJump() end
+            end
         )
     )
 
-    table.insert(Connections,
+    table.insert(CharacterConnections,
         Humanoid:GetPropertyChangedSignal("UseJumpPower"):Connect(
-            ApplyJump
+            function()
+                UpdateValue()
+            end
         )
     )
+
+    UpdateValue()
 end
 
--- Interfaz
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "FusionBrainrotJumpV2"
-Gui.ResetOnSpawn = false
+Player.CharacterAdded:Connect(SetupCharacter)
 
-local success = pcall(function()
-    Gui.Parent = game:GetService("CoreGui")
-end)
-
-if not success or not Gui.Parent then
-    Gui.Parent = Player:WaitForChild("PlayerGui")
+if Player.Character then
+    SetupCharacter(Player.Character)
 end
 
-local Main = Instance.new("Frame")
-Main.Size = UDim2.fromOffset(250, 165)
-Main.Position = UDim2.new(0.5, -125, 0.4, 0)
-Main.BackgroundColor3 = Color3.fromRGB(17, 19, 27)
-Main.BorderSizePixel = 0
-Main.Active = true
-Main.Parent = Gui
-
-Instance.new("UICorner", Main).CornerRadius =
-    UDim.new(0, 14)
-
-local Border = Instance.new("UIStroke", Main)
-Border.Color = Color3.fromRGB(0, 180, 255)
-Border.Thickness = 2
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.Text = "FUSION BRAINROT JUMP V2"
-Title.TextColor3 = Color3.fromRGB(0, 190, 255)
-Title.TextSize = 15
-Title.Font = Enum.Font.GothamBold
-Title.Parent = Main
-
-local Status = Instance.new("TextLabel")
-Status.Position = UDim2.fromOffset(0, 43)
-Status.Size = UDim2.new(1, 0, 0, 30)
-Status.BackgroundTransparency = 1
-Status.Text = "STATUS: OFF"
-Status.TextColor3 = Color3.fromRGB(255, 90, 90)
-Status.Font = Enum.Font.GothamBold
-Status.TextSize = 14
-Status.Parent = Main
-
-local Toggle = Instance.new("TextButton")
-Toggle.Position = UDim2.fromOffset(20, 82)
-Toggle.Size = UDim2.new(1, -40, 0, 43)
-Toggle.BackgroundColor3 = Color3.fromRGB(0, 115, 190)
-Toggle.Text = "ACTIVAR SUPER JUMP"
-Toggle.TextColor3 = Color3.new(1, 1, 1)
-Toggle.TextSize = 13
-Toggle.Font = Enum.Font.GothamBold
-Toggle.Parent = Main
-
-Instance.new("UICorner", Toggle).CornerRadius =
-    UDim.new(0, 9)
-
-local Info = Instance.new("TextLabel")
-Info.Position = UDim2.fromOffset(0, 133)
-Info.Size = UDim2.new(1, 0, 0, 23)
-Info.BackgroundTransparency = 1
-Info.Text = "CARRY MODE | POWER: 100"
-Info.TextColor3 = Color3.fromRGB(170, 180, 195)
-Info.Font = Enum.Font.Gotham
-Info.TextSize = 11
-Info.Parent = Main
-
--- Activación
-Toggle.MouseButton1Click:Connect(function()
-    Enabled = not Enabled
-
-    if Enabled then
-        ApplyJump()
-
-        Status.Text = "STATUS: ON"
-        Status.TextColor3 = Color3.fromRGB(0, 255, 130)
-        Toggle.Text = "DESACTIVAR SUPER JUMP"
-    else
-        Restore()
-
-        Status.Text = "STATUS: OFF"
-        Status.TextColor3 = Color3.fromRGB(255, 90, 90)
-        Toggle.Text = "ACTIVAR SUPER JUMP"
-    end
-end)
-
--- Compatibilidad con botón táctil
-table.insert(Connections,
-    UIS.JumpRequest:Connect(function()
-        if Enabled and Humanoid and Humanoid.Health > 0 then
-            ApplyJump()
-            Humanoid.Jump = true
-        end
-    end)
-)
-
--- Arrastrar ventana
+-- Ventana desplazable
 local dragging = false
 local dragStart
 local startPos
@@ -230,17 +274,10 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
--- Respawn
-Player.CharacterAdded:Connect(SetupCharacter)
-
-if Player.Character then
-    SetupCharacter(Player.Character)
-end
-
 Gui.Destroying:Connect(function()
     Enabled = false
-    Restore()
-    DisconnectAll()
+    RestoreJump()
+    DisconnectCharacter()
 end)
 
-print("[FUSION JUMP V2] Loaded")
+print("[FUSION JUMP V3] CARRY CONTROL LOADED")
