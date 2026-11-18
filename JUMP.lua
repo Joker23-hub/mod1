@@ -1,3 +1,5 @@
+Lua
+
 --[[
     FUSION BRAINROT JUMP
     Roblox - Delta Executor Android
