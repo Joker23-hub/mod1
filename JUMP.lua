@@ -1,69 +1,65 @@
---==================================================
--- FUSION BRAINROT JUMP V4
--- ROBLOX | DELTA ANDROID
--- CARRY CONTROL
---==================================================
+--====================================================
+-- FUSION BRAINROT TOOLKIT V5
+-- JUMP + SPEED | DELTA ANDROID
+--====================================================
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 
 -- CONFIGURATION
-local Enabled = false
-local Power = 55
-local Height = 8.5
+local JumpEnabled = false
+local SpeedEnabled = false
+local CarryMode = false
 
+local JumpPower = 55
+local JumpHeight = 8.5
+
+local NormalSpeed = 30
+local CarrySpeed = 20
+
+local MIN_SPEED = 16
+local MAX_SPEED = 30
 local MAX_POWER = 65
 local MIN_POWER = 40
-
 local MAX_HEIGHT = 20
 local MIN_HEIGHT = 7
 
 local Humanoid
 local Original = {}
-local CharacterConnections = {}
+local Connections = {}
 
---==================================================
--- CONNECTION MANAGEMENT
---==================================================
+--====================================================
+-- CHARACTER CONNECTIONS
+--====================================================
 
 local function DisconnectCharacter()
-    for _, connection in ipairs(CharacterConnections) do
-        if connection.Connected then
-            connection:Disconnect()
-        end
+    for _, c in ipairs(Connections) do
+        pcall(function()
+            c:Disconnect()
+        end)
     end
-
-    table.clear(CharacterConnections)
+    Connections = {}
 end
 
---==================================================
--- APPLY JUMP
---==================================================
+--====================================================
+-- JUMP SYSTEM
+--====================================================
 
 local function ApplyJump()
-    if not Enabled then return end
-    if not Humanoid then return end
+    if not JumpEnabled or not Humanoid then return end
     if Humanoid.Health <= 0 then return end
 
     if Humanoid.UseJumpPower then
-
-        if Humanoid.JumpPower ~= Power then
-            Humanoid.JumpPower = Power
+        if Humanoid.JumpPower ~= JumpPower then
+            Humanoid.JumpPower = JumpPower
         end
-
     else
-
-        if Humanoid.JumpHeight ~= Height then
-            Humanoid.JumpHeight = Height
+        if Humanoid.JumpHeight ~= JumpHeight then
+            Humanoid.JumpHeight = JumpHeight
         end
-
     end
 end
-
---==================================================
--- RESTORE ORIGINAL VALUES
---==================================================
 
 local function RestoreJump()
     if not Humanoid then return end
@@ -75,35 +71,59 @@ local function RestoreJump()
     if Original.JumpHeight ~= nil then
         Humanoid.JumpHeight = Original.JumpHeight
     end
+end
 
-    if Original.Jumping ~= nil then
-        Humanoid:SetStateEnabled(
-            Enum.HumanoidStateType.Jumping,
-            Original.Jumping
-        )
+--====================================================
+-- SPEED SYSTEM
+--====================================================
+
+local function GetTargetSpeed()
+    if CarryMode then
+        return CarrySpeed
+    end
+
+    return NormalSpeed
+end
+
+local function ApplySpeed()
+    if not SpeedEnabled or not Humanoid then return end
+    if Humanoid.Health <= 0 then return end
+
+    local target = GetTargetSpeed()
+
+    if Humanoid.WalkSpeed ~= target then
+        Humanoid.WalkSpeed = target
     end
 end
 
---==================================================
--- GUI
---==================================================
+local function RestoreSpeed()
+    if not Humanoid then return end
+
+    if Original.WalkSpeed ~= nil then
+        Humanoid.WalkSpeed = Original.WalkSpeed
+    end
+end
+
+--====================================================
+-- INTERFACE
+--====================================================
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "FusionBrainrotJumpV4"
+Gui.Name = "FusionBrainrotV5"
 Gui.ResetOnSpawn = false
 
-local success = pcall(function()
+local ok = pcall(function()
     Gui.Parent = game:GetService("CoreGui")
 end)
 
-if not success or not Gui.Parent then
+if not ok or not Gui.Parent then
     Gui.Parent = Player:WaitForChild("PlayerGui")
 end
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.fromOffset(255, 205)
-Main.Position = UDim2.new(0.5, -127, 0.4, 0)
+Main.Size = UDim2.fromOffset(290, 335)
+Main.Position = UDim2.new(0.5, -145, 0.35, 0)
 Main.BackgroundColor3 = Color3.fromRGB(17, 19, 27)
 Main.BorderSizePixel = 0
 Main.Active = true
@@ -112,206 +132,245 @@ Main.Parent = Gui
 Instance.new("UICorner", Main).CornerRadius =
     UDim.new(0, 14)
 
-local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(0, 180, 255)
-Stroke.Thickness = 2
-Stroke.Parent = Main
+local Border = Instance.new("UIStroke")
+Border.Color = Color3.fromRGB(0, 180, 255)
+Border.Thickness = 2
+Border.Parent = Main
 
---==================================================
--- LABEL FUNCTION
---==================================================
-
-local function CreateLabel(name, text, position, size)
-
-    local label = Instance.new("TextLabel")
-
-    label.Name = name
-    label.Position = position
-    label.Size = size
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 13
-    label.Parent = Main
-
-    return label
+local function Label(name, text, y, height, size)
+    local obj = Instance.new("TextLabel")
+    obj.Name = name
+    obj.Position = UDim2.fromOffset(5, y)
+    obj.Size = UDim2.new(1, -10, 0, height)
+    obj.BackgroundTransparency = 1
+    obj.Text = text
+    obj.TextColor3 = Color3.new(1, 1, 1)
+    obj.Font = Enum.Font.GothamBold
+    obj.TextSize = size or 13
+    obj.Parent = Main
+    return obj
 end
 
-local Title = CreateLabel(
-    "Title",
-    "FUSION BRAINROT JUMP V4",
-    UDim2.fromOffset(0, 8),
-    UDim2.new(1, 0, 0, 30)
-)
+local function Button(name, text, x, y, w, h)
+    local b = Instance.new("TextButton")
+    b.Name = name
+    b.Position = UDim2.fromOffset(x, y)
+    b.Size = UDim2.fromOffset(w, h)
+    b.BackgroundColor3 = Color3.fromRGB(0, 105, 175)
+    b.Text = text
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 13
+    b.Parent = Main
 
-Title.TextColor3 = Color3.fromRGB(0, 190, 255)
-
-local Status = CreateLabel(
-    "Status",
-    "STATUS: OFF",
-    UDim2.fromOffset(0, 40),
-    UDim2.new(1, 0, 0, 25)
-)
-
-Status.TextColor3 = Color3.fromRGB(255, 90, 90)
-
-local Value = CreateLabel(
-    "Value",
-    "POWER: 55",
-    UDim2.fromOffset(0, 76),
-    UDim2.new(1, 0, 0, 25)
-)
-
---==================================================
--- BUTTON FUNCTION
---==================================================
-
-local function CreateButton(name, text, position, size)
-
-    local button = Instance.new("TextButton")
-
-    button.Name = name
-    button.Position = position
-    button.Size = size
-    button.BackgroundColor3 = Color3.fromRGB(0, 105, 175)
-    button.Text = text
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 17
-    button.Parent = Main
-
-    Instance.new("UICorner", button).CornerRadius =
+    Instance.new("UICorner", b).CornerRadius =
         UDim.new(0, 8)
 
-    return button
+    return b
 end
 
-local Minus = CreateButton(
-    "Minus",
-    "-",
-    UDim2.fromOffset(30, 108),
-    UDim2.fromOffset(55, 35)
+-- TITLE
+local Title = Label(
+    "Title",
+    "FUSION BRAINROT TOOLKIT V5",
+    8, 30, 15
+)
+Title.TextColor3 = Color3.fromRGB(0, 190, 255)
+
+-- JUMP
+local JumpStatus = Label(
+    "JumpStatus",
+    "SUPER JUMP: OFF",
+    42, 23, 13
 )
 
-local Plus = CreateButton(
-    "Plus",
-    "+",
-    UDim2.fromOffset(170, 108),
-    UDim2.fromOffset(55, 35)
+local JumpValue = Label(
+    "JumpValue",
+    "JUMP HEIGHT: 8.5",
+    66, 22, 12
 )
 
-local Toggle = CreateButton(
-    "Toggle",
-    "ACTIVAR",
-    UDim2.fromOffset(30, 153),
-    UDim2.fromOffset(195, 38)
+local JumpMinus = Button(
+    "JumpMinus", "-", 30, 92, 55, 32
 )
 
---==================================================
--- UPDATE VALUE
---==================================================
+local JumpPlus = Button(
+    "JumpPlus", "+", 205, 92, 55, 32
+)
 
-local function UpdateValue()
+local JumpToggle = Button(
+    "JumpToggle", "ACTIVAR JUMP", 30, 132, 230, 34
+)
+
+-- SPEED
+local SpeedStatus = Label(
+    "SpeedStatus",
+    "SPEED: OFF",
+    176, 22, 13
+)
+
+local SpeedValue = Label(
+    "SpeedValue",
+    "NORMAL SPEED: 30",
+    199, 22, 12
+)
+
+local SpeedMinus = Button(
+    "SpeedMinus", "-", 30, 225, 55, 32
+)
+
+local SpeedPlus = Button(
+    "SpeedPlus", "+", 205, 225, 55, 32
+)
+
+local SpeedToggle = Button(
+    "SpeedToggle", "ACTIVAR SPEED", 30, 265, 230, 32
+)
+
+-- CARRY MODE
+local CarryToggle = Button(
+    "CarryToggle", "CARRY MODE: OFF", 30, 305, 230, 25
+)
+
+CarryToggle.TextSize = 11
+
+--====================================================
+-- UPDATE INTERFACE
+--====================================================
+
+local function UpdateInterface()
 
     if Humanoid and Humanoid.UseJumpPower then
-
-        Value.Text = "JUMP POWER: " .. Power
-
+        JumpValue.Text = "JUMP POWER: " .. JumpPower
     else
+        JumpValue.Text = "JUMP HEIGHT: " .. JumpHeight
+    end
 
-        Value.Text = "JUMP HEIGHT: " .. Height
+    JumpStatus.Text = JumpEnabled and
+        "SUPER JUMP: ON" or "SUPER JUMP: OFF"
 
+    JumpStatus.TextColor3 = JumpEnabled and
+        Color3.fromRGB(0, 255, 130) or
+        Color3.fromRGB(255, 100, 100)
+
+    SpeedStatus.Text = SpeedEnabled and
+        "SPEED: ON" or "SPEED: OFF"
+
+    SpeedStatus.TextColor3 = SpeedEnabled and
+        Color3.fromRGB(0, 255, 130) or
+        Color3.fromRGB(255, 100, 100)
+
+    SpeedValue.Text = "NORMAL: " .. NormalSpeed ..
+        " | CARRY: " .. CarrySpeed
+
+    CarryToggle.Text = CarryMode and
+        "CARRY MODE: ON (20)" or
+        "CARRY MODE: OFF"
+
+    CarryToggle.BackgroundColor3 = CarryMode and
+        Color3.fromRGB(0, 145, 90) or
+        Color3.fromRGB(0, 105, 175)
+end
+
+--====================================================
+-- JUMP CONTROLS
+--====================================================
+
+JumpMinus.MouseButton1Click:Connect(function()
+
+    if Humanoid and Humanoid.UseJumpPower then
+        JumpPower = math.max(MIN_POWER, JumpPower - 2)
+    else
+        JumpHeight = math.max(MIN_HEIGHT, JumpHeight - 1)
     end
 
     ApplyJump()
-end
-
---==================================================
--- DECREASE
---==================================================
-
-Minus.MouseButton1Click:Connect(function()
-
-    if Humanoid and Humanoid.UseJumpPower then
-
-        Power = math.max(
-            MIN_POWER,
-            Power - 2
-        )
-
-    else
-
-        Height = math.max(
-            MIN_HEIGHT,
-            Height - 1
-        )
-
-    end
-
-    UpdateValue()
-
+    UpdateInterface()
 end)
 
---==================================================
--- INCREASE
---==================================================
-
-Plus.MouseButton1Click:Connect(function()
+JumpPlus.MouseButton1Click:Connect(function()
 
     if Humanoid and Humanoid.UseJumpPower then
-
-        Power = math.min(
-            MAX_POWER,
-            Power + 2
-        )
-
+        JumpPower = math.min(MAX_POWER, JumpPower + 2)
     else
-
-        Height = math.min(
-            MAX_HEIGHT,
-            Height + 1
-        )
-
+        JumpHeight = math.min(MAX_HEIGHT, JumpHeight + 1)
     end
 
-    UpdateValue()
-
+    ApplyJump()
+    UpdateInterface()
 end)
 
---==================================================
--- ON / OFF
---==================================================
+JumpToggle.MouseButton1Click:Connect(function()
 
-Toggle.MouseButton1Click:Connect(function()
+    JumpEnabled = not JumpEnabled
 
-    Enabled = not Enabled
-
-    if Enabled then
-
+    if JumpEnabled then
         ApplyJump()
-
-        Status.Text = "STATUS: ON"
-        Status.TextColor3 = Color3.fromRGB(0, 255, 130)
-
-        Toggle.Text = "DESACTIVAR"
-
+        JumpToggle.Text = "DESACTIVAR JUMP"
     else
-
         RestoreJump()
-
-        Status.Text = "STATUS: OFF"
-        Status.TextColor3 = Color3.fromRGB(255, 90, 90)
-
-        Toggle.Text = "ACTIVAR"
-
+        JumpToggle.Text = "ACTIVAR JUMP"
     end
 
+    UpdateInterface()
 end)
 
---==================================================
+--====================================================
+-- SPEED CONTROLS
+--====================================================
+
+SpeedMinus.MouseButton1Click:Connect(function()
+
+    NormalSpeed = math.max(
+        MIN_SPEED,
+        NormalSpeed - 1
+    )
+
+    ApplySpeed()
+    UpdateInterface()
+end)
+
+SpeedPlus.MouseButton1Click:Connect(function()
+
+    NormalSpeed = math.min(
+        MAX_SPEED,
+        NormalSpeed + 1
+    )
+
+    ApplySpeed()
+    UpdateInterface()
+end)
+
+SpeedToggle.MouseButton1Click:Connect(function()
+
+    SpeedEnabled = not SpeedEnabled
+
+    if SpeedEnabled then
+        ApplySpeed()
+        SpeedToggle.Text = "DESACTIVAR SPEED"
+    else
+        RestoreSpeed()
+        SpeedToggle.Text = "ACTIVAR SPEED"
+    end
+
+    UpdateInterface()
+end)
+
+--====================================================
+-- CARRY MODE
+--====================================================
+
+CarryToggle.MouseButton1Click:Connect(function()
+
+    CarryMode = not CarryMode
+
+    ApplySpeed()
+    UpdateInterface()
+end)
+
+--====================================================
 -- CHARACTER SETUP
---==================================================
+--====================================================
 
 local function SetupCharacter(Character)
 
@@ -322,63 +381,52 @@ local function SetupCharacter(Character)
     Original = {
         JumpPower = Humanoid.JumpPower,
         JumpHeight = Humanoid.JumpHeight,
-
-        Jumping = Humanoid:GetStateEnabled(
-            Enum.HumanoidStateType.Jumping
-        )
+        WalkSpeed = Humanoid.WalkSpeed
     }
 
-    if Enabled then
+    if JumpEnabled then
         ApplyJump()
     end
 
-    table.insert(
-        CharacterConnections,
+    if SpeedEnabled then
+        ApplySpeed()
+    end
 
-        Humanoid:GetPropertyChangedSignal(
-            "JumpPower"
-        ):Connect(function()
+    table.insert(Connections,
+        Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(
+            function()
+                if JumpEnabled then ApplyJump() end
+            end
+        )
+    )
 
-            if Enabled then
+    table.insert(Connections,
+        Humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(
+            function()
+                if JumpEnabled then ApplyJump() end
+            end
+        )
+    )
+
+    table.insert(Connections,
+        Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(
+            function()
+                if SpeedEnabled then ApplySpeed() end
+            end
+        )
+    )
+
+    table.insert(Connections,
+        Humanoid:GetPropertyChangedSignal("UseJumpPower"):Connect(
+            function()
+                UpdateInterface()
                 ApplyJump()
             end
-
-        end)
+        )
     )
 
-    table.insert(
-        CharacterConnections,
-
-        Humanoid:GetPropertyChangedSignal(
-            "JumpHeight"
-        ):Connect(function()
-
-            if Enabled then
-                ApplyJump()
-            end
-
-        end)
-    )
-
-    table.insert(
-        CharacterConnections,
-
-        Humanoid:GetPropertyChangedSignal(
-            "UseJumpPower"
-        ):Connect(function()
-
-            UpdateValue()
-
-        end)
-    )
-
-    UpdateValue()
-
+    UpdateInterface()
 end
-
---==================================================
--- RESPAWN
---==================================================
 
 Player.CharacterAdded:Connect(SetupCharacter)
 
@@ -386,15 +434,15 @@ if Player.Character then
     SetupCharacter(Player.Character)
 end
 
---==================================================
--- DRAGGABLE MOBILE GUI
---==================================================
+--====================================================
+-- FLOATING WINDOW DRAG
+--====================================================
 
 local dragging = false
 local dragStart
 local startPos
 
-Main.InputBegan:Connect(function(input)
+Title.InputBegan:Connect(function(input)
 
     if input.UserInputType == Enum.UserInputType.Touch
     or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -402,9 +450,7 @@ Main.InputBegan:Connect(function(input)
         dragging = true
         dragStart = input.Position
         startPos = Main.Position
-
     end
-
 end)
 
 UIS.InputChanged:Connect(function(input)
@@ -422,9 +468,7 @@ UIS.InputChanged:Connect(function(input)
             startPos.Y.Scale,
             startPos.Y.Offset + delta.Y
         )
-
     end
-
 end)
 
 UIS.InputEnded:Connect(function(input)
@@ -433,23 +477,22 @@ UIS.InputEnded:Connect(function(input)
     or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
         dragging = false
-
     end
-
 end)
 
---==================================================
+--====================================================
 -- CLEANUP
---==================================================
+--====================================================
 
 Gui.Destroying:Connect(function()
 
-    Enabled = false
+    JumpEnabled = false
+    SpeedEnabled = false
 
     RestoreJump()
+    RestoreSpeed()
 
     DisconnectCharacter()
-
 end)
 
-print("[FUSION BRAINROT JUMP V4] LOADED")
+print("[FUSION TOOLKIT V5] LOADED SUCCESSFULLY")
