@@ -1,7 +1,7 @@
 --==================================================
--- FUSION BRAINROT TOOLKIT V6
+-- FUSION BRAINROT TOOLKIT V6.1
 -- JUMP ONLY | DELTA ANDROID
--- MINIMIZE / RESTORE
+-- MINIMIZE / RESTORE | LOW GRAVITY + AIR JUMP
 --==================================================
 
 local Players = game:GetService("Players")
@@ -9,6 +9,7 @@ local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 
 local Enabled = false
+local GravityEnabled = true
 local JumpPower = 55
 local JumpHeight = 8.5
 
@@ -17,9 +18,32 @@ local MAX_POWER = 65
 local MIN_HEIGHT = 7
 local MAX_HEIGHT = 20
 
+local GRAVITY_FACTOR = 0.30
+local GRAVITY_JUMP_COMP = math.sqrt(GRAVITY_FACTOR)
+
+local OriginalGravity = workspace.Gravity
+local LowGravityActive = false
+
 local Humanoid
 local Original = {}
 local Connections = {}
+
+--==================================================
+-- GRAVEDAD
+--==================================================
+
+local function SetLowGravity(on)
+
+on = on and true or false
+
+if on == LowGravityActive then return end
+LowGravityActive = on
+
+workspace.Gravity = on
+and (OriginalGravity * GRAVITY_FACTOR)
+or OriginalGravity
+
+end
 
 --==================================================
 -- GUI
@@ -30,23 +54,23 @@ Gui.Name = "FusionBrainrotV6"
 Gui.ResetOnSpawn = false
 
 local ok = pcall(function()
-    Gui.Parent = game:GetService("CoreGui")
+Gui.Parent = game:GetService("CoreGui")
 end)
 
 if not ok or not Gui.Parent then
-    Gui.Parent = Player:WaitForChild("PlayerGui")
+Gui.Parent = Player:WaitForChild("PlayerGui")
 end
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.fromOffset(255, 190)
-Main.Position = UDim2.new(0.5, -127, 0.4, 0)
+Main.Size = UDim2.fromOffset(255, 235)
+Main.Position = UDim2.new(0.5, -127, 0.35, 0)
 Main.BackgroundColor3 = Color3.fromRGB(17, 19, 27)
 Main.BorderSizePixel = 0
 Main.Active = true
 Main.Parent = Gui
 
 Instance.new("UICorner", Main).CornerRadius =
-    UDim.new(0, 14)
+UDim.new(0, 14)
 
 local Border = Instance.new("UIStroke", Main)
 Border.Color = Color3.fromRGB(0, 180, 255)
@@ -60,7 +84,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -48, 0, 38)
 Title.Position = UDim2.fromOffset(5, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "FUSION BRAINROT V6"
+Title.Text = "FUSION BRAINROT V6.1"
 Title.TextColor3 = Color3.fromRGB(0, 190, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.GothamBold
@@ -77,7 +101,7 @@ Minimize.Font = Enum.Font.GothamBold
 Minimize.Parent = Main
 
 Instance.new("UICorner", Minimize).CornerRadius =
-    UDim.new(0, 7)
+UDim.new(0, 7)
 
 --==================================================
 -- CONTENT
@@ -92,64 +116,74 @@ Content.Parent = Main
 
 local function CreateLabel(name, text, y, height, size)
 
-    local label = Instance.new("TextLabel")
-    label.Name = name
-    label.Position = UDim2.fromOffset(5, y)
-    label.Size = UDim2.new(1, -10, 0, height)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = size or 13
-    label.Parent = Content
+local label = Instance.new("TextLabel")
+label.Name = name
+label.Position = UDim2.fromOffset(5, y)
+label.Size = UDim2.new(1, -10, 0, height)
+label.BackgroundTransparency = 1
+label.Text = text
+label.TextColor3 = Color3.new(1, 1, 1)
+label.Font = Enum.Font.GothamBold
+label.TextSize = size or 13
+label.Parent = Content
 
-    return label
+return label
+
 end
 
 local function CreateButton(name, text, x, y, w, h)
 
-    local button = Instance.new("TextButton")
-    button.Name = name
-    button.Position = UDim2.fromOffset(x, y)
-    button.Size = UDim2.fromOffset(w, h)
-    button.BackgroundColor3 = Color3.fromRGB(0, 105, 175)
-    button.Text = text
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 15
-    button.Parent = Content
+local button = Instance.new("TextButton")
+button.Name = name
+button.Position = UDim2.fromOffset(x, y)
+button.Size = UDim2.fromOffset(w, h)
+button.BackgroundColor3 = Color3.fromRGB(0, 105, 175)
+button.Text = text
+button.TextColor3 = Color3.new(1, 1, 1)
+button.Font = Enum.Font.GothamBold
+button.TextSize = 15
+button.Parent = Content
 
-    Instance.new("UICorner", button).CornerRadius =
-        UDim.new(0, 8)
+Instance.new("UICorner", button).CornerRadius =
+    UDim.new(0, 8)
 
-    return button
+return button
+
 end
 
 local Status = CreateLabel(
-    "Status",
-    "SUPER JUMP: OFF",
-    3, 25, 14
+"Status",
+"SUPER JUMP: OFF",
+3, 25, 14
 )
 
 Status.TextColor3 = Color3.fromRGB(255, 90, 90)
 
 local Value = CreateLabel(
-    "Value",
-    "JUMP HEIGHT: 8.5",
-    31, 25, 13
+"Value",
+"JUMP HEIGHT: 8.5",
+31, 25, 13
 )
 
 local Minus = CreateButton(
-    "Minus", "-", 30, 65, 65, 38
+"Minus", "-", 30, 62, 65, 38
 )
 
 local Plus = CreateButton(
-    "Plus", "+", 160, 65, 65, 38
+"Plus", "+", 160, 62, 65, 38
 )
 
+local GravityBtn = CreateButton(
+"GravityBtn",
+"GRAVEDAD LUNAR: ON",
+30, 106, 195, 32
+)
+
+GravityBtn.TextSize = 13
+
 local Toggle = CreateButton(
-    "Toggle", "ACTIVAR SUPER JUMP",
-    30, 115, 195, 38
+"Toggle", "ACTIVAR SUPER JUMP",
+30, 146, 195, 38
 )
 
 --==================================================
@@ -158,44 +192,128 @@ local Toggle = CreateButton(
 
 local function ApplyJump()
 
-    if not Enabled then return end
-    if not Humanoid then return end
-    if Humanoid.Health <= 0 then return end
+if not Enabled then return end
+if not Humanoid then return end
+if Humanoid.Health <= 0 then return end
 
-    if Humanoid.UseJumpPower then
+if Humanoid.UseJumpPower then
 
-        if Humanoid.JumpPower ~= JumpPower then
-            Humanoid.JumpPower = JumpPower
-        end
+    local target = JumpPower
 
-    else
-
-        if Humanoid.JumpHeight ~= JumpHeight then
-            Humanoid.JumpHeight = JumpHeight
-        end
-
+    if LowGravityActive then
+        target = JumpPower * GRAVITY_JUMP_COMP
     end
+
+    if Humanoid.JumpPower ~= target then
+        Humanoid.JumpPower = target
+    end
+
+else
+
+    if Humanoid.JumpHeight ~= JumpHeight then
+        Humanoid.JumpHeight = JumpHeight
+    end
+
+end
+
 end
 
 local function RestoreJump()
 
-    if not Humanoid then return end
+if not Humanoid then return end
 
-    if Original.JumpPower ~= nil then
-        Humanoid.JumpPower = Original.JumpPower
-    end
-
-    if Original.JumpHeight ~= nil then
-        Humanoid.JumpHeight = Original.JumpHeight
-    end
-
-    if Original.Jumping ~= nil then
-        Humanoid:SetStateEnabled(
-            Enum.HumanoidStateType.Jumping,
-            Original.Jumping
-        )
-    end
+if Original.JumpPower ~= nil then
+    Humanoid.JumpPower = Original.JumpPower
 end
+
+if Original.JumpHeight ~= nil then
+    Humanoid.JumpHeight = Original.JumpHeight
+end
+
+if Original.Jumping ~= nil then
+    Humanoid:SetStateEnabled(
+        Enum.HumanoidStateType.Jumping,
+        Original.Jumping
+    )
+end
+
+end
+
+--==================================================
+-- AIRE / ATERRIZAJE
+--==================================================
+
+local AIR_STATES = {
+[Enum.HumanoidStateType.Freefall] = true,
+[Enum.HumanoidStateType.Jumping] = true,
+[Enum.HumanoidStateType.FallingDown] = true,
+[Enum.HumanoidStateType.Ragdoll] = true,
+}
+
+local GROUND_STATES = {
+[Enum.HumanoidStateType.Landed] = true,
+[Enum.HumanoidStateType.Running] = true,
+[Enum.HumanoidStateType.RunningNoPhysics] = true,
+[Enum.HumanoidStateType.Climbing] = true,
+[Enum.HumanoidStateType.Swimming] = true,
+[Enum.HumanoidStateType.Seated] = true,
+}
+
+local function OnStateChanged(_, newState)
+
+if not Enabled then return end
+if not GravityEnabled then return end
+
+if AIR_STATES[newState] then
+
+    SetLowGravity(true)
+    ApplyJump()
+
+elseif GROUND_STATES[newState] then
+
+    SetLowGravity(false)
+    ApplyJump()
+
+end
+
+end
+
+--==================================================
+-- SALTO EN EL AIRE
+--==================================================
+
+UIS.JumpRequest:Connect(function()
+
+if not Enabled then return end
+if not Humanoid or Humanoid.Health <= 0 then return end
+
+Humanoid:SetStateEnabled(
+    Enum.HumanoidStateType.Jumping,
+    true
+)
+
+if Humanoid.FloorMaterial == Enum.Material.Air then
+
+    if GravityEnabled then
+        SetLowGravity(true)
+    end
+
+    ApplyJump()
+    Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+
+else
+
+    if GravityEnabled then
+        task.delay(0.03, function()
+            if Enabled and GravityEnabled then
+                SetLowGravity(true)
+            end
+        end)
+    end
+
+end
+
+end)
 
 --==================================================
 -- UPDATE INTERFACE
@@ -203,17 +321,18 @@ end
 
 local function UpdateInterface()
 
-    if Humanoid and Humanoid.UseJumpPower then
+if Humanoid and Humanoid.UseJumpPower then
 
-        Value.Text = "JUMP POWER: " .. JumpPower
+    Value.Text = "JUMP POWER: " .. JumpPower
 
-    else
+else
 
-        Value.Text = "JUMP HEIGHT: " .. JumpHeight
+    Value.Text = "JUMP HEIGHT: " .. JumpHeight
 
-    end
+end
 
-    ApplyJump()
+ApplyJump()
+
 end
 
 --==================================================
@@ -222,69 +341,98 @@ end
 
 Minus.MouseButton1Click:Connect(function()
 
-    if Humanoid and Humanoid.UseJumpPower then
+if Humanoid and Humanoid.UseJumpPower then
 
-        JumpPower = math.max(
-            MIN_POWER,
-            JumpPower - 2
-        )
+    JumpPower = math.max(
+        MIN_POWER,
+        JumpPower - 2
+    )
 
-    else
+else
 
-        JumpHeight = math.max(
-            MIN_HEIGHT,
-            JumpHeight - 1
-        )
+    JumpHeight = math.max(
+        MIN_HEIGHT,
+        JumpHeight - 1
+    )
 
-    end
+end
 
-    UpdateInterface()
+UpdateInterface()
+
 end)
 
 Plus.MouseButton1Click:Connect(function()
 
-    if Humanoid and Humanoid.UseJumpPower then
+if Humanoid and Humanoid.UseJumpPower then
 
-        JumpPower = math.min(
-            MAX_POWER,
-            JumpPower + 2
-        )
+    JumpPower = math.min(
+        MAX_POWER,
+        JumpPower + 2
+    )
 
-    else
+else
 
-        JumpHeight = math.min(
-            MAX_HEIGHT,
-            JumpHeight + 1
-        )
+    JumpHeight = math.min(
+        MAX_HEIGHT,
+        JumpHeight + 1
+    )
 
+end
+
+UpdateInterface()
+
+end)
+
+GravityBtn.MouseButton1Click:Connect(function()
+
+GravityEnabled = not GravityEnabled
+
+if GravityEnabled then
+
+    GravityBtn.Text = "GRAVEDAD LUNAR: ON"
+
+    if Enabled then
+        ApplyJump()
     end
 
-    UpdateInterface()
+else
+
+    GravityBtn.Text = "GRAVEDAD LUNAR: OFF"
+    SetLowGravity(false)
+
+    if Enabled then
+        ApplyJump()
+    end
+
+end
+
 end)
 
 Toggle.MouseButton1Click:Connect(function()
 
-    Enabled = not Enabled
+Enabled = not Enabled
 
-    if Enabled then
+if Enabled then
 
-        ApplyJump()
+    ApplyJump()
 
-        Status.Text = "SUPER JUMP: ON"
-        Status.TextColor3 = Color3.fromRGB(0, 255, 130)
+    Status.Text = "SUPER JUMP: ON"
+    Status.TextColor3 = Color3.fromRGB(0, 255, 130)
 
-        Toggle.Text = "DESACTIVAR SUPER JUMP"
+    Toggle.Text = "DESACTIVAR SUPER JUMP"
 
-    else
+else
 
-        RestoreJump()
+    SetLowGravity(false)
+    RestoreJump()
 
-        Status.Text = "SUPER JUMP: OFF"
-        Status.TextColor3 = Color3.fromRGB(255, 90, 90)
+    Status.Text = "SUPER JUMP: OFF"
+    Status.TextColor3 = Color3.fromRGB(255, 90, 90)
 
-        Toggle.Text = "ACTIVAR SUPER JUMP"
+    Toggle.Text = "ACTIVAR SUPER JUMP"
 
-    end
+end
+
 end)
 
 --==================================================
@@ -293,64 +441,76 @@ end)
 
 local function DisconnectCharacter()
 
-    for _, connection in ipairs(Connections) do
-        pcall(function()
-            connection:Disconnect()
-        end)
-    end
+for _, connection in ipairs(Connections) do
+    pcall(function()
+        connection:Disconnect()
+    end)
+end
 
-    Connections = {}
+Connections = {}
+
 end
 
 local function SetupCharacter(Character)
 
-    DisconnectCharacter()
+DisconnectCharacter()
 
-    Humanoid = Character:WaitForChild("Humanoid")
+Humanoid = Character:WaitForChild("Humanoid")
 
-    Original = {
-        JumpPower = Humanoid.JumpPower,
-        JumpHeight = Humanoid.JumpHeight,
-        Jumping = Humanoid:GetStateEnabled(
-            Enum.HumanoidStateType.Jumping
-        )
-    }
-
-    if Enabled then
-        ApplyJump()
-    end
-
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(
-            function()
-                if Enabled then ApplyJump() end
-            end
-        )
+Original = {
+    JumpPower = Humanoid.JumpPower,
+    JumpHeight = Humanoid.JumpHeight,
+    Jumping = Humanoid:GetStateEnabled(
+        Enum.HumanoidStateType.Jumping
     )
+}
 
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(
-            function()
-                if Enabled then ApplyJump() end
-            end
-        )
+if Enabled then
+    ApplyJump()
+end
+
+table.insert(Connections,
+    Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(
+        function()
+            if Enabled then ApplyJump() end
+        end
     )
+)
 
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("UseJumpPower"):Connect(
-            function()
-                UpdateInterface()
-            end
-        )
+table.insert(Connections,
+    Humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(
+        function()
+            if Enabled then ApplyJump() end
+        end
     )
+)
 
-    UpdateInterface()
+table.insert(Connections,
+    Humanoid:GetPropertyChangedSignal("UseJumpPower"):Connect(
+        function()
+            UpdateInterface()
+        end
+    )
+)
+
+table.insert(Connections,
+    Humanoid.StateChanged:Connect(OnStateChanged)
+)
+
+table.insert(Connections,
+    Humanoid.Died:Connect(function()
+        SetLowGravity(false)
+    end)
+)
+
+UpdateInterface()
+
 end
 
 Player.CharacterAdded:Connect(SetupCharacter)
 
 if Player.Character then
-    SetupCharacter(Player.Character)
+SetupCharacter(Player.Character)
 end
 
 --==================================================
@@ -361,21 +521,22 @@ local Minimized = false
 
 Minimize.MouseButton1Click:Connect(function()
 
-    Minimized = not Minimized
+Minimized = not Minimized
 
-    Content.Visible = not Minimized
+Content.Visible = not Minimized
 
-    if Minimized then
+if Minimized then
 
-        Main.Size = UDim2.fromOffset(255, 40)
-        Minimize.Text = "+"
+    Main.Size = UDim2.fromOffset(255, 40)
+    Minimize.Text = "+"
 
-    else
+else
 
-        Main.Size = UDim2.fromOffset(255, 190)
-        Minimize.Text = "-"
+    Main.Size = UDim2.fromOffset(255, 235)
+    Minimize.Text = "-"
 
-    end
+end
+
 end)
 
 --==================================================
@@ -388,42 +549,45 @@ local startPosition
 
 Title.InputBegan:Connect(function(input)
 
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+if input.UserInputType == Enum.UserInputType.Touch
+or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-        dragging = true
-        dragStart = input.Position
-        startPosition = Main.Position
+    dragging = true
+    dragStart = input.Position
+    startPosition = Main.Position
 
-    end
+end
+
 end)
 
 UIS.InputChanged:Connect(function(input)
 
-    if dragging and (
-        input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseMovement
-    ) then
+if dragging and (
+    input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseMovement
+) then
 
-        local delta = input.Position - dragStart
+    local delta = input.Position - dragStart
 
-        Main.Position = UDim2.new(
-            startPosition.X.Scale,
-            startPosition.X.Offset + delta.X,
-            startPosition.Y.Scale,
-            startPosition.Y.Offset + delta.Y
-        )
-    end
+    Main.Position = UDim2.new(
+        startPosition.X.Scale,
+        startPosition.X.Offset + delta.X,
+        startPosition.Y.Scale,
+        startPosition.Y.Offset + delta.Y
+    )
+end
+
 end)
 
 UIS.InputEnded:Connect(function(input)
 
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+if input.UserInputType == Enum.UserInputType.Touch
+or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-        dragging = false
+    dragging = false
 
-    end
+end
+
 end)
 
 --==================================================
@@ -432,11 +596,12 @@ end)
 
 Gui.Destroying:Connect(function()
 
-    Enabled = false
+Enabled = false
 
-    RestoreJump()
-    DisconnectCharacter()
+SetLowGravity(false)
+RestoreJump()
+DisconnectCharacter()
 
 end)
 
-print("[FUSION BRAINROT V6] LOADED")
+print("[FUSION BRAINROT V6.1] LOADED")
