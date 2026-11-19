@@ -1,12 +1,18 @@
 --==================================================
--- FUSION BRAINROT TOOLKIT V6
--- JUMP ONLY | DELTA ANDROID
--- MINIMIZE / RESTORE
+-- FUSION BRAINROT TOOLKIT V7
+-- SUPER JUMP + RAYOS BASES
+-- DELTA ANDROID
 --==================================================
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
 local Player = Players.LocalPlayer
+
+--==================================================
+-- CONFIGURACION
+--==================================================
 
 local Enabled = false
 local JumpPower = 55
@@ -17,16 +23,39 @@ local MAX_POWER = 65
 local MIN_HEIGHT = 7
 local MAX_HEIGHT = 20
 
+-- RAYOS BASES
+local BaseEffectEnabled = false
+local BASE_TRANSPARENCY = 0.70
+
+-- Nombres utilizados para detectar las bases
+local BASE_KEYWORDS = {
+    "base",
+    "plot"
+}
+
+-- Elementos que no deben modificarse
+local EXCLUDED_KEYWORDS = {
+    "brainrot",
+    "pet",
+    "egg",
+    "tool",
+    "character",
+    "avatar"
+}
+
 local Humanoid
 local Original = {}
 local Connections = {}
+
+-- Guarda la transparencia original de cada pieza
+local OriginalBaseTransparency = {}
 
 --==================================================
 -- GUI
 --==================================================
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "FusionBrainrotV6"
+Gui.Name = "FusionBrainrotV7"
 Gui.ResetOnSpawn = false
 
 local ok = pcall(function()
@@ -38,7 +67,7 @@ if not ok or not Gui.Parent then
 end
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.fromOffset(255, 190)
+Main.Size = UDim2.fromOffset(255, 265)
 Main.Position = UDim2.new(0.5, -127, 0.4, 0)
 Main.BackgroundColor3 = Color3.fromRGB(17, 19, 27)
 Main.BorderSizePixel = 0
@@ -60,7 +89,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -48, 0, 38)
 Title.Position = UDim2.fromOffset(5, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "FUSION BRAINROT V6"
+Title.Text = "FUSION BRAINROT V7"
 Title.TextColor3 = Color3.fromRGB(0, 190, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.GothamBold
@@ -91,7 +120,6 @@ Content.BackgroundTransparency = 1
 Content.Parent = Main
 
 local function CreateLabel(name, text, y, height, size)
-
     local label = Instance.new("TextLabel")
     label.Name = name
     label.Position = UDim2.fromOffset(5, y)
@@ -102,12 +130,10 @@ local function CreateLabel(name, text, y, height, size)
     label.Font = Enum.Font.GothamBold
     label.TextSize = size or 13
     label.Parent = Content
-
     return label
 end
 
 local function CreateButton(name, text, x, y, w, h)
-
     local button = Instance.new("TextButton")
     button.Name = name
     button.Position = UDim2.fromOffset(x, y)
@@ -116,7 +142,7 @@ local function CreateButton(name, text, x, y, w, h)
     button.Text = text
     button.TextColor3 = Color3.new(1, 1, 1)
     button.Font = Enum.Font.GothamBold
-    button.TextSize = 15
+    button.TextSize = 14
     button.Parent = Content
 
     Instance.new("UICorner", button).CornerRadius =
@@ -125,8 +151,12 @@ local function CreateButton(name, text, x, y, w, h)
     return button
 end
 
+--==================================================
+-- JUMP INTERFACE
+--==================================================
+
 local Status = CreateLabel(
-    "Status",
+    "JumpStatus",
     "SUPER JUMP: OFF",
     3, 25, 14
 )
@@ -134,7 +164,7 @@ local Status = CreateLabel(
 Status.TextColor3 = Color3.fromRGB(255, 90, 90)
 
 local Value = CreateLabel(
-    "Value",
+    "JumpValue",
     "JUMP HEIGHT: 8.5",
     31, 25, 13
 )
@@ -148,8 +178,27 @@ local Plus = CreateButton(
 )
 
 local Toggle = CreateButton(
-    "Toggle", "ACTIVAR SUPER JUMP",
-    30, 115, 195, 38
+    "JumpToggle",
+    "ACTIVAR SUPER JUMP",
+    30, 115, 195, 36
+)
+
+--==================================================
+-- RAYOS BASES INTERFACE
+--==================================================
+
+local BaseStatus = CreateLabel(
+    "BaseStatus",
+    "RAYOS BASES: OFF",
+    157, 23, 14
+)
+
+BaseStatus.TextColor3 = Color3.fromRGB(255, 90, 90)
+
+local BaseToggle = CreateButton(
+    "BaseToggle",
+    "ACTIVAR RAYOS BASES",
+    30, 183, 195, 36
 )
 
 --==================================================
@@ -197,27 +246,208 @@ local function RestoreJump()
     end
 end
 
---==================================================
--- UPDATE INTERFACE
---==================================================
-
 local function UpdateInterface()
 
     if Humanoid and Humanoid.UseJumpPower then
-
         Value.Text = "JUMP POWER: " .. JumpPower
-
     else
-
         Value.Text = "JUMP HEIGHT: " .. JumpHeight
-
     end
 
     ApplyJump()
 end
 
 --==================================================
--- BUTTONS
+-- BASE DETECTION
+--==================================================
+
+local function ContainsKeyword(name, keywords)
+
+    local lowerName = string.lower(name)
+
+    for _, keyword in ipairs(keywords) do
+        if string.find(lowerName, keyword, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function IsBaseContainer(instance)
+
+    if not instance:IsA("Model")
+    and not instance:IsA("Folder") then
+        return false
+    end
+
+    if ContainsKeyword(instance.Name, BASE_KEYWORDS) then
+        return true
+    end
+
+    return false
+end
+
+-- Busca la base a la que pertenece una pieza
+local function FindBase(instance)
+
+    local current = instance.Parent
+
+    while current and current ~= Workspace do
+
+        if IsBaseContainer(current) then
+            return current
+        end
+
+        current = current.Parent
+    end
+
+    return nil
+end
+
+-- Evita modificar Brainrots y otros modelos excluidos
+local function IsExcluded(instance, base)
+
+    local current = instance.Parent
+
+    while current and current ~= base do
+
+        if ContainsKeyword(
+            current.Name,
+            EXCLUDED_KEYWORDS
+        ) then
+            return true
+        end
+
+        if current:IsA("Model")
+        and current:FindFirstChildOfClass("Humanoid") then
+            return true
+        end
+
+        current = current.Parent
+    end
+
+    return false
+end
+
+--==================================================
+-- APPLY GLASS EFFECT
+--==================================================
+
+local function ApplyToPart(part)
+
+    if not BaseEffectEnabled then return end
+    if not part:IsA("BasePart") then return end
+
+    local base = FindBase(part)
+
+    if not base then return end
+    if IsExcluded(part, base) then return end
+
+    -- Guarda el valor original una sola vez
+    if OriginalBaseTransparency[part] == nil then
+        OriginalBaseTransparency[part] =
+            part.LocalTransparencyModifier
+    end
+
+    -- Efecto vidrio: 70% de transparencia
+    pcall(function()
+        part.LocalTransparencyModifier =
+            BASE_TRANSPARENCY
+    end)
+end
+
+local function ScanBases()
+
+    for _, instance in ipairs(Workspace:GetDescendants()) do
+
+        if instance:IsA("BasePart") then
+            ApplyToPart(instance)
+        end
+
+    end
+end
+
+--==================================================
+-- RESTORE BASE APPEARANCE
+--==================================================
+
+local function RestoreBases()
+
+    for part, originalValue in pairs(
+        OriginalBaseTransparency
+    ) do
+
+        if part and part.Parent then
+
+            pcall(function()
+                part.LocalTransparencyModifier =
+                    originalValue
+            end)
+
+        end
+
+    end
+
+    table.clear(OriginalBaseTransparency)
+end
+
+--==================================================
+-- RAYOS BASES ON / OFF
+--==================================================
+
+local function SetBaseEffect(state)
+
+    BaseEffectEnabled = state
+
+    if BaseEffectEnabled then
+
+        ScanBases()
+
+        BaseStatus.Text = "RAYOS BASES: ON"
+        BaseStatus.TextColor3 =
+            Color3.fromRGB(0, 255, 130)
+
+        BaseToggle.Text = "DESACTIVAR RAYOS BASES"
+
+    else
+
+        RestoreBases()
+
+        BaseStatus.Text = "RAYOS BASES: OFF"
+        BaseStatus.TextColor3 =
+            Color3.fromRGB(255, 90, 90)
+
+        BaseToggle.Text = "ACTIVAR RAYOS BASES"
+
+    end
+end
+
+BaseToggle.MouseButton1Click:Connect(function()
+
+    SetBaseEffect(not BaseEffectEnabled)
+
+end)
+
+-- Detecta piezas nuevas que aparezcan mientras está activo
+Workspace.DescendantAdded:Connect(function(instance)
+
+    if not BaseEffectEnabled then return end
+
+    if instance:IsA("BasePart") then
+
+        task.defer(function()
+            if BaseEffectEnabled and instance.Parent then
+                ApplyToPart(instance)
+            end
+        end)
+
+    end
+
+end)
+
+--==================================================
+-- JUMP BUTTONS
 --==================================================
 
 Minus.MouseButton1Click:Connect(function()
@@ -271,7 +501,8 @@ Toggle.MouseButton1Click:Connect(function()
         ApplyJump()
 
         Status.Text = "SUPER JUMP: ON"
-        Status.TextColor3 = Color3.fromRGB(0, 255, 130)
+        Status.TextColor3 =
+            Color3.fromRGB(0, 255, 130)
 
         Toggle.Text = "DESACTIVAR SUPER JUMP"
 
@@ -280,7 +511,8 @@ Toggle.MouseButton1Click:Connect(function()
         RestoreJump()
 
         Status.Text = "SUPER JUMP: OFF"
-        Status.TextColor3 = Color3.fromRGB(255, 90, 90)
+        Status.TextColor3 =
+            Color3.fromRGB(255, 90, 90)
 
         Toggle.Text = "ACTIVAR SUPER JUMP"
 
@@ -294,9 +526,11 @@ end)
 local function DisconnectCharacter()
 
     for _, connection in ipairs(Connections) do
+
         pcall(function()
             connection:Disconnect()
         end)
+
     end
 
     Connections = {}
@@ -320,28 +554,41 @@ local function SetupCharacter(Character)
         ApplyJump()
     end
 
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(
-            function()
-                if Enabled then ApplyJump() end
+    table.insert(
+        Connections,
+        Humanoid:GetPropertyChangedSignal(
+            "JumpPower"
+        ):Connect(function()
+
+            if Enabled then
+                ApplyJump()
             end
-        )
+
+        end)
     )
 
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(
-            function()
-                if Enabled then ApplyJump() end
+    table.insert(
+        Connections,
+        Humanoid:GetPropertyChangedSignal(
+            "JumpHeight"
+        ):Connect(function()
+
+            if Enabled then
+                ApplyJump()
             end
-        )
+
+        end)
     )
 
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("UseJumpPower"):Connect(
-            function()
-                UpdateInterface()
-            end
-        )
+    table.insert(
+        Connections,
+        Humanoid:GetPropertyChangedSignal(
+            "UseJumpPower"
+        ):Connect(function()
+
+            UpdateInterface()
+
+        end)
     )
 
     UpdateInterface()
@@ -372,10 +619,11 @@ Minimize.MouseButton1Click:Connect(function()
 
     else
 
-        Main.Size = UDim2.fromOffset(255, 190)
+        Main.Size = UDim2.fromOffset(255, 265)
         Minimize.Text = "-"
 
     end
+
 end)
 
 --==================================================
@@ -396,6 +644,7 @@ Title.InputBegan:Connect(function(input)
         startPosition = Main.Position
 
     end
+
 end)
 
 UIS.InputChanged:Connect(function(input)
@@ -413,7 +662,9 @@ UIS.InputChanged:Connect(function(input)
             startPosition.Y.Scale,
             startPosition.Y.Offset + delta.Y
         )
+
     end
+
 end)
 
 UIS.InputEnded:Connect(function(input)
@@ -424,6 +675,7 @@ UIS.InputEnded:Connect(function(input)
         dragging = false
 
     end
+
 end)
 
 --==================================================
@@ -433,10 +685,12 @@ end)
 Gui.Destroying:Connect(function()
 
     Enabled = false
+    BaseEffectEnabled = false
 
     RestoreJump()
+    RestoreBases()
     DisconnectCharacter()
 
 end)
 
-print("[FUSION BRAINROT V6] LOADED")
+print("[FUSION BRAINROT TOOLKIT V7] LOADED")
