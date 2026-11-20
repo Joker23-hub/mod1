@@ -1,7 +1,7 @@
 --==================================================
--- FUSION BRAINROT TOOLKIT V8 STEALTH
+-- FUSION BRAINROT TOOLKIT V7 STEALTH
 -- JUMP ONLY | DELTA ANDROID
--- VELOCITY BASED | TOGGLES SEPARADOS
+-- VELOCITY BASED | NO PROPIEDADES TOCADAS
 --==================================================
 
 local Players = game:GetService("Players")
@@ -9,21 +9,23 @@ local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
 
-local JumpEnabled = false
-local FloatEnabled = false
+local Enabled = false
 
-local Impulse = 50
+local Impulse = 55
 local AirFactor = 0.85
-local GravityPct = 55
+local GravityReduction = 0.55
 local MaxAirJumps = math.huge
 
 local ASCENT_TOO = false
 local JUMP_DEBOUNCE = 0.10
 
-local MIN_IMPULSE = 1
+local MIN_IMPULSE = 25
 local MAX_IMPULSE = 95
-local MIN_PCT = 1
-local MAX_PCT = 95
+local IMPULSE_STEP = 5
+
+local MIN_REDUCTION = 0.05
+local MAX_REDUCTION = 0.85
+local REDUCTION_STEP = 0.05
 
 local AIR_OPTIONS = {math.huge, 0, 1, 2, 3}
 
@@ -85,41 +87,14 @@ Vector3.new(v.X, vel, v.Z)
 
 end
 
-local function RaiseVelocity(target)
-
-local hrp = Root()
-if not hrp then return end
-
-local v = hrp.AssemblyLinearVelocity
-
-if v.Y >= target then return end
-
-hrp.AssemblyLinearVelocity =
-Vector3.new(v.X, target, v.Z)
-
-end
-
-local function RestoreHumanoid()
-
-if not Humanoid then return end
-if Original.Jumping == nil then return end
-
-pcall(function()
-    Humanoid:SetStateEnabled(
-        Enum.HumanoidStateType.Jumping,
-        Original.Jumping
-    )
-end)
-
-end
-
 --==================================================
--- FLOTACIÓN
+-- GRAVEDAD EMULADA
 --==================================================
 
 local function OnPhysics(dt)
 
-if not FloatEnabled then return end
+if not Enabled then return end
+if GravityReduction <= 0 then return end
 
 local hum = Humanoid
 
@@ -141,14 +116,14 @@ if v.Magnitude > 600 then return end
 if v.Y >= 0 and not ASCENT_TOO then return end
 
 local extra =
-workspace.Gravity * (GravityPct / 100) * math.min(dt, 1 / 30)
+workspace.Gravity * GravityReduction * math.min(dt, 1 / 30)
 
 hrp.AssemblyLinearVelocity =
 Vector3.new(v.X, v.Y + extra, v.Z)
 
 end
 
-local function StartFloat()
+local function StartGravity()
 
 if gravityConn then return end
 
@@ -156,7 +131,7 @@ gravityConn = RunService.Heartbeat:Connect(OnPhysics)
 
 end
 
-local function StopFloat()
+local function StopGravity()
 
 if gravityConn then
     gravityConn:Disconnect()
@@ -171,33 +146,39 @@ end
 
 UIS.JumpRequest:Connect(function()
 
+if not Enabled then return end
+
 local hum = Humanoid
 if not hum or hum.Health <= 0 then return end
 
+local now = os.clock()
+if now - lastJump < JUMP_DEBOUNCE then return end
+
 if IsAirborne(hum) then
 
-    if not JumpEnabled then return end
-
     if MaxAirJumps ~= math.huge then
+
         if MaxAirJumps <= 0 then return end
         if airJumps >= MaxAirJumps then return end
-    end
 
-    local now = os.clock()
-    if now - lastJump < JUMP_DEBOUNCE then return end
+    end
 
     airJumps += 1
     lastJump = now
 
-    RaiseVelocity(Impulse * AirFactor)
+    hum:SetStateEnabled(
+        Enum.HumanoidStateType.Jumping,
+        true
+    )
+
+    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+
+    SetVertical(Impulse * AirFactor)
 
 else
 
     airJumps = 0
-
-    if not JumpEnabled then return end
-
-    lastJump = os.clock()
+    lastJump = now
 
     hum:SetStateEnabled(
         Enum.HumanoidStateType.Jumping,
@@ -217,7 +198,7 @@ end)
 --==================================================
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "FusionBrainrotV8"
+Gui.Name = "FusionBrainrotV7"
 Gui.ResetOnSpawn = false
 
 local ok = pcall(function()
@@ -229,7 +210,7 @@ Gui.Parent = Player:WaitForChild("PlayerGui")
 end
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.fromOffset(255, 252)
+Main.Size = UDim2.fromOffset(255, 272)
 Main.Position = UDim2.new(0.5, -127, 0.3, 0)
 Main.BackgroundColor3 = Color3.fromRGB(17, 19, 27)
 Main.BorderSizePixel = 0
@@ -247,7 +228,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -48, 0, 38)
 Title.Position = UDim2.fromOffset(5, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "FUSION BRAINROT V8"
+Title.Text = "FUSION BRAINROT V7"
 Title.TextColor3 = Color3.fromRGB(0, 190, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.GothamBold
@@ -290,7 +271,7 @@ return label
 
 end
 
-local function CreateButton(name, text, x, y, w, h, size)
+local function CreateButton(name, text, x, y, w, h)
 
 local button = Instance.new("TextButton")
 button.Name = name
@@ -300,7 +281,7 @@ button.BackgroundColor3 = Color3.fromRGB(0, 105, 175)
 button.Text = text
 button.TextColor3 = Color3.new(1, 1, 1)
 button.Font = Enum.Font.GothamBold
-button.TextSize = size or 15
+button.TextSize = 15
 button.Parent = Content
 
 Instance.new("UICorner", button).CornerRadius =
@@ -312,8 +293,8 @@ end
 
 local Status = CreateLabel(
 "Status",
-"JUMP: OFF   FLOT: OFF",
-3, 20, 12
+"SUPER JUMP: OFF",
+3, 22, 14
 )
 
 Status.TextColor3 = Color3.fromRGB(255, 90, 90)
@@ -321,47 +302,42 @@ Status.TextColor3 = Color3.fromRGB(255, 90, 90)
 local Value = CreateLabel(
 "Value",
 "IMPULSO: " .. Impulse,
-25, 18, 12
+27, 20, 13
 )
 
 local Minus = CreateButton(
-"Minus", "-", 30, 45, 65, 30
+"Minus", "-", 30, 49, 65, 34
 )
 
 local Plus = CreateButton(
-"Plus", "+", 160, 45, 65, 30
+"Plus", "+", 160, 49, 65, 34
 )
 
 local GravValue = CreateLabel(
 "GravValue",
-"FLOTACIÓN: " .. GravityPct .. "%",
-80, 18, 12
+"FLOTACIÓN: " .. math.floor(GravityReduction * 100) .. "%",
+88, 20, 13
 )
 
 local GravMinus = CreateButton(
-"GravMinus", "-", 30, 100, 65, 30
+"GravMinus", "-", 30, 110, 65, 34
 )
 
 local GravPlus = CreateButton(
-"GravPlus", "+", 160, 100, 65, 30
+"GravPlus", "+", 160, 110, 65, 34
 )
 
 local AirBtn = CreateButton(
 "AirBtn",
 "SALTOS EN AIRE: INF",
-30, 134, 195, 28, 12
+30, 148, 195, 30
 )
 
-local ToggleJump = CreateButton(
-"ToggleJump",
-"SUPER JUMP: OFF",
-30, 168, 95, 32, 11
-)
+AirBtn.TextSize = 13
 
-local ToggleFloat = CreateButton(
-"ToggleFloat",
-"FLOTACIÓN: OFF",
-130, 168, 95, 32, 11
+local Toggle = CreateButton(
+"Toggle", "ACTIVAR SUPER JUMP",
+30, 182, 195, 38
 )
 
 --==================================================
@@ -381,30 +357,11 @@ end
 local function UpdateInterface()
 
 Value.Text = "IMPULSO: " .. Impulse
-GravValue.Text = "FLOTACIÓN: " .. GravityPct .. "%"
+
+GravValue.Text =
+"FLOTACIÓN: " .. math.floor(GravityReduction * 100) .. "%"
+
 AirBtn.Text = AirText()
-
-local jumpText = JumpEnabled and "ON" or "OFF"
-local floatText = FloatEnabled and "ON" or "OFF"
-
-Status.Text = "JUMP: " .. jumpText .. "   FLOT: " .. floatText
-
-if JumpEnabled or FloatEnabled then
-    Status.TextColor3 = Color3.fromRGB(0, 255, 130)
-else
-    Status.TextColor3 = Color3.fromRGB(255, 90, 90)
-end
-
-ToggleJump.Text = "SUPER JUMP: " .. jumpText
-ToggleFloat.Text = "FLOTACIÓN: " .. floatText
-
-ToggleJump.BackgroundColor3 = JumpEnabled
-and Color3.fromRGB(0, 160, 90)
-or Color3.fromRGB(0, 105, 175)
-
-ToggleFloat.BackgroundColor3 = FloatEnabled
-and Color3.fromRGB(0, 160, 90)
-or Color3.fromRGB(0, 105, 175)
 
 end
 
@@ -413,23 +370,39 @@ end
 --==================================================
 
 Minus.MouseButton1Click:Connect(function()
-Impulse = math.max(MIN_IMPULSE, Impulse - 1)
+
+Impulse = math.max(MIN_IMPULSE, Impulse - IMPULSE_STEP)
 UpdateInterface()
+
 end)
 
 Plus.MouseButton1Click:Connect(function()
-Impulse = math.min(MAX_IMPULSE, Impulse + 1)
+
+Impulse = math.min(MAX_IMPULSE, Impulse + IMPULSE_STEP)
 UpdateInterface()
+
 end)
 
 GravMinus.MouseButton1Click:Connect(function()
-GravityPct = math.max(MIN_PCT, GravityPct - 1)
+
+GravityReduction = math.max(
+MIN_REDUCTION,
+GravityReduction - REDUCTION_STEP
+)
+
 UpdateInterface()
+
 end)
 
 GravPlus.MouseButton1Click:Connect(function()
-GravityPct = math.min(MAX_PCT, GravityPct + 1)
+
+GravityReduction = math.min(
+MAX_REDUCTION,
+GravityReduction + REDUCTION_STEP
+)
+
 UpdateInterface()
+
 end)
 
 AirBtn.MouseButton1Click:Connect(function()
@@ -452,32 +425,31 @@ UpdateInterface()
 
 end)
 
-ToggleJump.MouseButton1Click:Connect(function()
+Toggle.MouseButton1Click:Connect(function()
 
-JumpEnabled = not JumpEnabled
+Enabled = not Enabled
 
-if not JumpEnabled then
-    RestoreHumanoid()
-end
+if Enabled then
 
-airJumps = 0
-lastJump = 0
+    airJumps = 0
+    StartGravity()
 
-UpdateInterface()
+    Status.Text = "SUPER JUMP: ON"
+    Status.TextColor3 = Color3.fromRGB(0, 255, 130)
 
-end)
+    Toggle.Text = "DESACTIVAR SUPER JUMP"
 
-ToggleFloat.MouseButton1Click:Connect(function()
-
-FloatEnabled = not FloatEnabled
-
-if FloatEnabled then
-    StartFloat()
 else
-    StopFloat()
-end
 
-UpdateInterface()
+    StopGravity()
+    RestoreHumanoid()
+
+    Status.Text = "SUPER JUMP: OFF"
+    Status.TextColor3 = Color3.fromRGB(255, 90, 90)
+
+    Toggle.Text = "ACTIVAR SUPER JUMP"
+
+end
 
 end)
 
@@ -510,7 +482,6 @@ Original = {
 }
 
 airJumps = 0
-lastJump = 0
 
 table.insert(Connections,
     Humanoid.StateChanged:Connect(function(_, newState)
@@ -525,13 +496,12 @@ table.insert(Connections,
 
 table.insert(Connections,
     Humanoid.Died:Connect(function()
-        StopFloat()
-        airJumps = 0
+        StopGravity()
     end)
 )
 
-if FloatEnabled then
-    StartFloat()
+if Enabled then
+    StartGravity()
 end
 
 UpdateInterface()
@@ -560,7 +530,7 @@ if Minimized then
     Main.Size = UDim2.fromOffset(255, 40)
     Minimize.Text = "+"
 else
-    Main.Size = UDim2.fromOffset(255, 252)
+    Main.Size = UDim2.fromOffset(255, 272)
     Minimize.Text = "-"
 end
 
@@ -623,13 +593,12 @@ end)
 
 Gui.Destroying:Connect(function()
 
-JumpEnabled = false
-FloatEnabled = false
+Enabled = false
 
-StopFloat()
+StopGravity()
 RestoreHumanoid()
 DisconnectCharacter()
 
 end)
 
-print("[FUSION BRAINROT V8 STEALTH] LOADED")
+print("[FUSION BRAINROT V7 STEALTH] LOADED")
