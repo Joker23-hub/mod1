@@ -1,702 +1,349 @@
 --==================================================
--- FUSION BRAINROT TOOLKIT V9
--- JUMP ONLY | DELTA ANDROID
--- LOGICA V6 + FLOTACION + AIR JUMP
+-- V11 VUELO / HOVER (BLOQUE AÑADIDO)
+-- NO MODIFICA NADA DE LO ANTERIOR
 --==================================================
 
-local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local Player = Players.LocalPlayer
+local FEnabled = false
+local FSpeed = 45
+local FForward, FBack, FLeft, FRight = false, false, false, false
+local FUp, FDown = false, false
+local FConn
+local FBody
 
-local Enabled = false
-local FloatEnabled = false
-local AirEnabled = false
+local FGui = Instance.new("ScreenGui")
+FGui.Name = "FusionBrainrotFly"
+FGui.ResetOnSpawn = false
 
-local JumpPower = 55
-local JumpHeight = 8.5
-local GravityPct = 55
-local MaxAirJumps = math.huge
-
-local MIN_POWER = 40
-local MAX_POWER = 65
-local MIN_HEIGHT = 7
-local MAX_HEIGHT = 20
-local MIN_PCT = 1
-local MAX_PCT = 95
-
-local AIR_FACTOR = 0.90
-local AIR_DEBOUNCE = 0.12
-local ASCENT_TOO = false
-
-local AIR_OPTIONS = {math.huge, 0, 1, 2, 3}
-
-local Humanoid
-local Original = {}
-local Connections = {}
-local airJumps = 0
-local lastJump = 0
-local gravityConn
-
---==================================================
--- HELPERS
---==================================================
-
-local BLOCKED = {
-    [Enum.HumanoidStateType.Climbing] = true,
-    [Enum.HumanoidStateType.Swimming] = true,
-    [Enum.HumanoidStateType.Seated] = true,
-    [Enum.HumanoidStateType.Dead] = true,
-    [Enum.HumanoidStateType.PlatformStanding] = true,
-    [Enum.HumanoidStateType.Ragdoll] = true,
-}
-
-local function Root()
-
-    local char = Player.Character
-    if not char then return nil end
-
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-
-    if hrp and hrp:IsDescendantOf(workspace) then
-        return hrp
-    end
-
-    return nil
-end
-
-local function IsAirborne(hum)
-
-    if not hum then return false end
-    if hum.Health <= 0 then return false end
-    if hum.FloorMaterial ~= Enum.Material.Air then return false end
-    if BLOCKED[hum:GetState()] then return false end
-
-    return true
-end
-
---==================================================
--- GUI
---==================================================
-
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "FusionBrainrotV9"
-Gui.ResetOnSpawn = false
-
-local ok = pcall(function()
-    Gui.Parent = game:GetService("CoreGui")
+local fok = pcall(function()
+    FGui.Parent = game:GetService("CoreGui")
 end)
 
-if not ok or not Gui.Parent then
-    Gui.Parent = Player:WaitForChild("PlayerGui")
+if not fok or not FGui.Parent then
+    FGui.Parent = Player:WaitForChild("PlayerGui")
 end
 
-local Main = Instance.new("Frame")
-Main.Size = UDim2.fromOffset(255, 296)
-Main.Position = UDim2.new(0.5, -127, 0.3, 0)
-Main.BackgroundColor3 = Color3.fromRGB(17, 19, 27)
-Main.BorderSizePixel = 0
-Main.Active = true
-Main.Parent = Gui
+local FMain = Instance.new("Frame")
+FMain.Size = UDim2.fromOffset(190, 232)
+FMain.Position = UDim2.new(0.5, 135, 0.62, 0)
+FMain.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
+FMain.BorderSizePixel = 0
+FMain.Active = true
+FMain.Parent = FGui
 
-Instance.new("UICorner", Main).CornerRadius =
-    UDim.new(0, 14)
+Instance.new("UICorner", FMain).CornerRadius = UDim.new(0, 12)
 
-local Border = Instance.new("UIStroke", Main)
-Border.Color = Color3.fromRGB(0, 180, 255)
-Border.Thickness = 2
+local FBorder = Instance.new("UIStroke", FMain)
+FBorder.Color = Color3.fromRGB(190, 0, 255)
+FBorder.Thickness = 2
 
---==================================================
--- HEADER
---==================================================
+local FTitle = Instance.new("TextLabel")
+FTitle.Size = UDim2.new(1, -34, 0, 32)
+FTitle.Position = UDim2.fromOffset(5, 0)
+FTitle.BackgroundTransparency = 1
+FTitle.Text = "VUELO V11"
+FTitle.TextColor3 = Color3.fromRGB(190, 0, 255)
+FTitle.TextSize = 13
+FTitle.Font = Enum.Font.GothamBold
+FTitle.Parent = FMain
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -48, 0, 38)
-Title.Position = UDim2.fromOffset(5, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "FUSION BRAINROT V9"
-Title.TextColor3 = Color3.fromRGB(0, 190, 255)
-Title.TextSize = 14
-Title.Font = Enum.Font.GothamBold
-Title.Parent = Main
+local FMin = Instance.new("TextButton")
+FMin.Size = UDim2.fromOffset(26, 24)
+FMin.Position = UDim2.new(1, -30, 0, 4)
+FMin.BackgroundColor3 = Color3.fromRGB(110, 0, 160)
+FMin.Text = "-"
+FMin.TextColor3 = Color3.new(1, 1, 1)
+FMin.TextSize = 18
+FMin.Font = Enum.Font.GothamBold
+FMin.Parent = FMain
 
-local Minimize = Instance.new("TextButton")
-Minimize.Size = UDim2.fromOffset(32, 28)
-Minimize.Position = UDim2.new(1, -39, 0, 5)
-Minimize.BackgroundColor3 = Color3.fromRGB(0, 105, 175)
-Minimize.Text = "-"
-Minimize.TextColor3 = Color3.new(1, 1, 1)
-Minimize.TextSize = 20
-Minimize.Font = Enum.Font.GothamBold
-Minimize.Parent = Main
+Instance.new("UICorner", FMin).CornerRadius = UDim.new(0, 6)
 
-Instance.new("UICorner", Minimize).CornerRadius =
-    UDim.new(0, 7)
+local FContent = Instance.new("Frame")
+FContent.Position = UDim2.fromOffset(0, 34)
+FContent.Size = UDim2.new(1, 0, 1, -34)
+FContent.BackgroundTransparency = 1
+FContent.Parent = FMain
 
---==================================================
--- CONTENT
---==================================================
+local function FButton(text, x, y, w, h, size)
 
-local Content = Instance.new("Frame")
-Content.Name = "Content"
-Content.Position = UDim2.fromOffset(0, 40)
-Content.Size = UDim2.new(1, 0, 1, -40)
-Content.BackgroundTransparency = 1
-Content.Parent = Main
+    local b = Instance.new("TextButton")
+    b.Position = UDim2.fromOffset(x, y)
+    b.Size = UDim2.fromOffset(w, h)
+    b.BackgroundColor3 = Color3.fromRGB(110, 0, 160)
+    b.Text = text
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = size or 15
+    b.Parent = FContent
 
-local function CreateLabel(name, text, y, height, size)
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
 
-    local label = Instance.new("TextLabel")
-    label.Name = name
-    label.Position = UDim2.fromOffset(5, y)
-    label.Size = UDim2.new(1, -10, 0, height)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = size or 13
-    label.Parent = Content
-
-    return label
+    return b
 end
 
-local function CreateButton(name, text, x, y, w, h, size)
+local FSpeedLabel = Instance.new("TextLabel")
+FSpeedLabel.Position = UDim2.fromOffset(5, 2)
+FSpeedLabel.Size = UDim2.new(1, -10, 0, 18)
+FSpeedLabel.BackgroundTransparency = 1
+FSpeedLabel.Text = "VELOCIDAD: " .. FSpeed
+FSpeedLabel.TextColor3 = Color3.new(1, 1, 1)
+FSpeedLabel.Font = Enum.Font.GothamBold
+FSpeedLabel.TextSize = 12
+FSpeedLabel.Parent = FContent
 
-    local button = Instance.new("TextButton")
-    button.Name = name
-    button.Position = UDim2.fromOffset(x, y)
-    button.Size = UDim2.fromOffset(w, h)
-    button.BackgroundColor3 = Color3.fromRGB(0, 105, 175)
-    button.Text = text
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = size or 15
-    button.Parent = Content
+local FSMinus = FButton("-", 15, 24, 50, 26)
+local FSPlus = FButton("+", 125, 24, 50, 26)
 
-    Instance.new("UICorner", button).CornerRadius =
-        UDim.new(0, 8)
+local FLeftBtn = FButton("<<", 15, 58, 50, 38)
+local FUpBtn = FButton("^", 70, 58, 50, 38)
+local FRightBtn = FButton(">>", 125, 58, 50, 38)
+local FDownBtn = FButton("v", 70, 100, 50, 38)
 
-    return button
-end
+local FAltUp = FButton("SUBIR", 15, 100, 50, 38, 11)
+local FAltDown = FButton("BAJAR", 125, 100, 50, 38, 11)
 
-local Status = CreateLabel(
-    "Status",
-    "SUPER JUMP: OFF",
-    3, 24, 14
-)
-
-Status.TextColor3 = Color3.fromRGB(255, 90, 90)
-
-local Value = CreateLabel(
-    "Value",
-    "JUMP HEIGHT: 8.5",
-    30, 20, 13
-)
-
-local Minus = CreateButton(
-    "Minus", "-", 30, 54, 65, 34
-)
-
-local Plus = CreateButton(
-    "Plus", "+", 160, 54, 65, 34
-)
-
-local FloatValue = CreateLabel(
-    "FloatValue",
-    "FLOTACIÓN: 55%",
-    92, 20, 13
-)
-
-local FloatMinus = CreateButton(
-    "FloatMinus", "-", 30, 116, 65, 30
-)
-
-local FloatPlus = CreateButton(
-    "FloatPlus", "+", 160, 116, 65, 30
-)
-
-local AirBtn = CreateButton(
-    "AirBtn",
-    "SALTOS EN AIRE: INF",
-    30, 150, 195, 28, 12
-)
-
-local Toggle = CreateButton(
-    "Toggle", "ACTIVAR SUPER JUMP",
-    30, 182, 195, 34
-)
-
-local FloatBtn = CreateButton(
-    "FloatBtn", "ACTIVAR FLOTACIÓN",
-    30, 220, 195, 32, 13
-)
+local FHold = FButton("HOVER", 15, 144, 160, 28, 12)
+local FToggle = FButton("ACTIVAR VUELO", 15, 178, 160, 30, 12)
 
 --==================================================
--- JUMP SYSTEM (LOGICA V6)
+-- MOTOR
 --==================================================
 
-local function ApplyJump()
+local function ClearInput()
 
-    if not Enabled then return end
-    if not Humanoid then return end
-    if Humanoid.Health <= 0 then return end
-
-    if Humanoid.UseJumpPower then
-
-        if Humanoid.JumpPower ~= JumpPower then
-            Humanoid.JumpPower = JumpPower
-        end
-
-    else
-
-        if Humanoid.JumpHeight ~= JumpHeight then
-            Humanoid.JumpHeight = JumpHeight
-        end
-
-    end
+    FForward, FBack = false, false
+    FLeft, FRight = false, false
+    FUp, FDown = false, false
 end
 
-local function RestoreJump()
+local function StopFly()
 
-    if not Humanoid then return end
-
-    if Original.JumpPower ~= nil then
-        Humanoid.JumpPower = Original.JumpPower
+    if FConn then
+        FConn:Disconnect()
+        FConn = nil
     end
 
-    if Original.JumpHeight ~= nil then
-        Humanoid.JumpHeight = Original.JumpHeight
+    if FBody then
+        pcall(function() FBody:Destroy() end)
+        FBody = nil
     end
 
-    if Original.Jumping ~= nil then
-        Humanoid:SetStateEnabled(
-            Enum.HumanoidStateType.Jumping,
-            Original.Jumping
-        )
-    end
+    ClearInput()
 end
 
---==================================================
--- FLOTACION
---==================================================
+local function FlyStep()
 
-local function OnPhysics(dt)
-
-    if not FloatEnabled then return end
-
+    local hrp = Root()
     local hum = Humanoid
-    if not hum or hum.Health <= 0 then return end
 
-    if hum.FloorMaterial ~= Enum.Material.Air then
-        airJumps = 0
-        return
-    end
+    if not hrp or not hum or hum.Health <= 0 then
 
-    if BLOCKED[hum:GetState()] then return end
-
-    local hrp = Root()
-    if not hrp then return end
-
-    local v = hrp.AssemblyLinearVelocity
-
-    if v.Magnitude > 600 then return end
-    if v.Y >= 0 and not ASCENT_TOO then return end
-
-    local extra =
-        workspace.Gravity * (GravityPct / 100) * math.min(dt, 1 / 30)
-
-    hrp.AssemblyLinearVelocity =
-        Vector3.new(v.X, v.Y + extra, v.Z)
-end
-
-local function StartFloat()
-
-    if gravityConn then return end
-
-    gravityConn = RunService.Heartbeat:Connect(OnPhysics)
-end
-
-local function StopFloat()
-
-    if gravityConn then
-        gravityConn:Disconnect()
-        gravityConn = nil
-    end
-end
-
---==================================================
--- SALTO EN EL AIRE
---==================================================
-
-local function JumpVelocity()
-
-    if not Humanoid then return 50 end
-
-    if Humanoid.UseJumpPower then
-
-        if Enabled then return JumpPower end
-        return Humanoid.JumpPower
-
-    end
-
-    local gravity = workspace.Gravity
-    local height = Enabled and JumpHeight or Humanoid.JumpHeight
-
-    if gravity <= 0 then return 50 end
-
-    return math.sqrt(2 * gravity * height)
-end
-
-UIS.JumpRequest:Connect(function()
-
-    if not Humanoid or Humanoid.Health <= 0 then return end
-
-    if not IsAirborne(Humanoid) then
-        airJumps = 0
-        lastJump = os.clock()
-        return
-    end
-
-    if not AirEnabled then return end
-
-    if MaxAirJumps ~= math.huge then
-        if MaxAirJumps <= 0 then return end
-        if airJumps >= MaxAirJumps then return end
-    end
-
-    local now = os.clock()
-    if now - lastJump < AIR_DEBOUNCE then return end
-    lastJump = now
-
-    local hrp = Root()
-    if not hrp then return end
-
-    local target = JumpVelocity() * AIR_FACTOR
-    local v = hrp.AssemblyLinearVelocity
-
-    if v.Y >= target then return end
-
-    airJumps += 1
-
-    hrp.AssemblyLinearVelocity =
-        Vector3.new(v.X, target, v.Z)
-end)
-
---==================================================
--- UPDATE INTERFACE
---==================================================
-
-local function AirText()
-
-    if MaxAirJumps == math.huge then
-        return "SALTOS EN AIRE: INF"
-    end
-
-    return "SALTOS EN AIRE: " .. MaxAirJumps
-end
-
-local function UpdateInterface()
-
-    if Humanoid and Humanoid.UseJumpPower then
-
-        Value.Text = "JUMP POWER: " .. JumpPower
-
-    else
-
-        Value.Text = "JUMP HEIGHT: " .. JumpHeight
-
-    end
-
-    FloatValue.Text = "FLOTACIÓN: " .. GravityPct .. "%"
-    AirBtn.Text = AirText()
-
-    Toggle.BackgroundColor3 = Enabled
-        and Color3.fromRGB(0, 160, 90)
-        or Color3.fromRGB(0, 105, 175)
-
-    FloatBtn.BackgroundColor3 = FloatEnabled
-        and Color3.fromRGB(0, 160, 90)
-        or Color3.fromRGB(0, 105, 175)
-
-    AirBtn.BackgroundColor3 = AirEnabled
-        and Color3.fromRGB(0, 160, 90)
-        or Color3.fromRGB(0, 105, 175)
-
-    ApplyJump()
-end
-
---==================================================
--- BUTTONS
---==================================================
-
-Minus.MouseButton1Click:Connect(function()
-
-    if Humanoid and Humanoid.UseJumpPower then
-
-        JumpPower = math.max(
-            MIN_POWER,
-            JumpPower - 2
-        )
-
-    else
-
-        JumpHeight = math.max(
-            MIN_HEIGHT,
-            JumpHeight - 1
-        )
-
-    end
-
-    UpdateInterface()
-end)
-
-Plus.MouseButton1Click:Connect(function()
-
-    if Humanoid and Humanoid.UseJumpPower then
-
-        JumpPower = math.min(
-            MAX_POWER,
-            JumpPower + 2
-        )
-
-    else
-
-        JumpHeight = math.min(
-            MAX_HEIGHT,
-            JumpHeight + 1
-        )
-
-    end
-
-    UpdateInterface()
-end)
-
-FloatMinus.MouseButton1Click:Connect(function()
-
-    GravityPct = math.max(MIN_PCT, GravityPct - 1)
-    UpdateInterface()
-end)
-
-FloatPlus.MouseButton1Click:Connect(function()
-
-    GravityPct = math.min(MAX_PCT, GravityPct + 1)
-    UpdateInterface()
-end)
-
-AirBtn.MouseButton1Click:Connect(function()
-
-    local index = 1
-
-    for i, option in ipairs(AIR_OPTIONS) do
-        if option == MaxAirJumps then
-            index = i
-            break
+        if FBody and not hrp then
+            StopFly()
         end
+
+        return
     end
 
-    index = (index % #AIR_OPTIONS) + 1
+    local cam = workspace.CurrentCamera
+    if not cam then return end
 
-    MaxAirJumps = AIR_OPTIONS[index]
-    airJumps = 0
+    local look = cam.CFrame.LookVector
+    local right = cam.CFrame.RightVector
 
-    UpdateInterface()
+    local dir = Vector3.zero
+
+    if FForward then
+        dir += Vector3.new(look.X, 0, look.Z).Unit
+    end
+
+    if FBack then
+        dir -= Vector3.new(look.X, 0, look.Z).Unit
+    end
+
+    if FRight then
+        dir += Vector3.new(right.X, 0, right.Z).Unit
+    end
+
+    if FLeft then
+        dir -= Vector3.new(right.X, 0, right.Z).Unit
+    end
+
+    if FUp then
+        dir += Vector3.yAxis
+    end
+
+    if FDown then
+        dir -= Vector3.yAxis
+    end
+
+    if dir.Magnitude > 0 then
+        dir = dir.Unit * FSpeed
+    end
+
+    if FBody then
+        FBody.Velocity = dir
+    end
+end
+
+local function StartFly()
+
+    local hrp = Root()
+    if not hrp then return end
+
+    if FBody then
+        pcall(function() FBody:Destroy() end)
+        FBody = nil
+    end
+
+    local body = Instance.new("BodyVelocity")
+    body.Name = "FusionFly"
+    body.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    body.P = 1250
+    body.Velocity = Vector3.zero
+    body.Parent = hrp
+
+    FBody = body
+
+    if FConn then
+        FConn:Disconnect()
+    end
+
+    FConn = RunService.RenderStepped:Connect(FlyStep)
+end
+
+local function BindHold(button, flag)
+
+    button.InputBegan:Connect(function(input)
+
+        if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            flag(true)
+        end
+    end)
+
+    button.InputEnded:Connect(function(input)
+
+        if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            flag(false)
+        end
+    end)
+end
+
+BindHold(FForward and FUpBtn or FUpBtn, function(v) FForward = v end)
+
+BindHold(FLeftBtn, function(v) FLeft = v end)
+BindHold(FRightBtn, function(v) FRight = v end)
+BindHold(FDownBtn, function(v) FBack = v end)
+BindHold(FAltUp, function(v) FUp = v end)
+BindHold(FAltDown, function(v) FDown = v end)
+
+--==================================================
+-- BOTONES
+--==================================================
+
+FSMinus.MouseButton1Click:Connect(function()
+
+    FSpeed = math.max(5, FSpeed - 5)
+    FSpeedLabel.Text = "VELOCIDAD: " .. FSpeed
 end)
 
-Toggle.MouseButton1Click:Connect(function()
+FSPlus.MouseButton1Click:Connect(function()
 
-    Enabled = not Enabled
+    FSpeed = math.min(250, FSpeed + 5)
+    FSpeedLabel.Text = "VELOCIDAD: " .. FSpeed
+end)
 
-    if Enabled then
+FHold.MouseButton1Click:Connect(function()
+    ClearInput()
+end)
 
-        ApplyJump()
+FToggle.MouseButton1Click:Connect(function()
 
-        Status.Text = "SUPER JUMP: ON"
-        Status.TextColor3 = Color3.fromRGB(0, 255, 130)
+    FEnabled = not FEnabled
 
-        Toggle.Text = "DESACTIVAR SUPER JUMP"
+    if FEnabled then
+
+        StartFly()
+
+        FToggle.Text = "DESACTIVAR VUELO"
+        FToggle.BackgroundColor3 = Color3.fromRGB(0, 160, 90)
 
     else
 
-        RestoreJump()
+        StopFly()
 
-        Status.Text = "SUPER JUMP: OFF"
-        Status.TextColor3 = Color3.fromRGB(255, 90, 90)
-
-        Toggle.Text = "ACTIVAR SUPER JUMP"
-
+        FToggle.Text = "ACTIVAR VUELO"
+        FToggle.BackgroundColor3 = Color3.fromRGB(110, 0, 160)
     end
-
-    UpdateInterface()
 end)
 
-FloatBtn.MouseButton1Click:Connect(function()
+--==================================================
+-- RESPAWN
+--==================================================
 
-    FloatEnabled = not FloatEnabled
+Player.CharacterAdded:Connect(function()
 
-    if FloatEnabled then
+    if not FEnabled then return end
 
-        StartFloat()
-        FloatBtn.Text = "DESACTIVAR FLOTACIÓN"
+    task.wait(0.4)
 
+    if FEnabled then
+        StartFly()
+    end
+end)
+
+--==================================================
+-- MINIMIZAR / ARRASTRAR
+--==================================================
+
+local FMinimized = false
+
+FMin.MouseButton1Click:Connect(function()
+
+    FMinimized = not FMinimized
+
+    FContent.Visible = not FMinimized
+
+    if FMinimized then
+        FMain.Size = UDim2.fromOffset(190, 32)
+        FMin.Text = "+"
     else
-
-        StopFloat()
-        FloatBtn.Text = "ACTIVAR FLOTACIÓN"
-
-    end
-
-    UpdateInterface()
-end)
-
---==================================================
--- CHARACTER SETUP
---==================================================
-
-local function DisconnectCharacter()
-
-    for _, connection in ipairs(Connections) do
-        pcall(function()
-            connection:Disconnect()
-        end)
-    end
-
-    Connections = {}
-end
-
-local function SetupCharacter(Character)
-
-    DisconnectCharacter()
-
-    Humanoid = Character:WaitForChild("Humanoid")
-
-    Original = {
-        JumpPower = Humanoid.JumpPower,
-        JumpHeight = Humanoid.JumpHeight,
-        Jumping = Humanoid:GetStateEnabled(
-            Enum.HumanoidStateType.Jumping
-        )
-    }
-
-    airJumps = 0
-    lastJump = 0
-
-    if Enabled then
-        ApplyJump()
-    end
-
-    if FloatEnabled then
-        StartFloat()
-    end
-
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(
-            function()
-                if Enabled then ApplyJump() end
-            end
-        )
-    )
-
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(
-            function()
-                if Enabled then ApplyJump() end
-            end
-        )
-    )
-
-    table.insert(Connections,
-        Humanoid:GetPropertyChangedSignal("UseJumpPower"):Connect(
-            function()
-                UpdateInterface()
-            end
-        )
-    )
-
-    table.insert(Connections,
-        Humanoid.StateChanged:Connect(function(_, newState)
-
-            if newState == Enum.HumanoidStateType.Landed
-            or newState == Enum.HumanoidStateType.Running then
-                airJumps = 0
-            end
-        end)
-    )
-
-    table.insert(Connections,
-        Humanoid.Died:Connect(function()
-            StopFloat()
-            airJumps = 0
-        end)
-    )
-
-    UpdateInterface()
-end
-
-Player.CharacterAdded:Connect(SetupCharacter)
-
-if Player.Character then
-    SetupCharacter(Player.Character)
-end
-
---==================================================
--- MINIMIZE / RESTORE
---==================================================
-
-local Minimized = false
-
-Minimize.MouseButton1Click:Connect(function()
-
-    Minimized = not Minimized
-
-    Content.Visible = not Minimized
-
-    if Minimized then
-
-        Main.Size = UDim2.fromOffset(255, 40)
-        Minimize.Text = "+"
-
-    else
-
-        Main.Size = UDim2.fromOffset(255, 296)
-        Minimize.Text = "-"
-
+        FMain.Size = UDim2.fromOffset(190, 232)
+        FMin.Text = "-"
     end
 end)
 
---==================================================
--- DRAG WINDOW
---==================================================
+local fDragging = false
+local fDragStart
+local fStartPos
 
-local dragging = false
-local dragStart
-local startPosition
-
-Title.InputBegan:Connect(function(input)
+FTitle.InputBegan:Connect(function(input)
 
     if input.UserInputType == Enum.UserInputType.Touch
     or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-        dragging = true
-        dragStart = input.Position
-        startPosition = Main.Position
-
+        fDragging = true
+        fDragStart = input.Position
+        fStartPos = FMain.Position
     end
 end)
 
 UIS.InputChanged:Connect(function(input)
 
-    if dragging and (
+    if fDragging and (
         input.UserInputType == Enum.UserInputType.Touch
         or input.UserInputType == Enum.UserInputType.MouseMovement
     ) then
 
-        local delta = input.Position - dragStart
+        local delta = input.Position - fDragStart
 
-        Main.Position = UDim2.new(
-            startPosition.X.Scale,
-            startPosition.X.Offset + delta.X,
-            startPosition.Y.Scale,
-            startPosition.Y.Offset + delta.Y
+        FMain.Position = UDim2.new(
+            fStartPos.X.Scale,
+            fStartPos.X.Offset + delta.X,
+            fStartPos.Y.Scale,
+            fStartPos.Y.Offset + delta.Y
         )
     end
 end)
@@ -705,25 +352,14 @@ UIS.InputEnded:Connect(function(input)
 
     if input.UserInputType == Enum.UserInputType.Touch
     or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
-        dragging = false
-
+        fDragging = false
     end
 end)
 
---==================================================
--- CLEANUP
---==================================================
+FGui.Destroying:Connect(function()
 
-Gui.Destroying:Connect(function()
-
-    Enabled = false
-    FloatEnabled = false
-    AirEnabled = false
-
-    StopFloat()
-    RestoreJump()
-    DisconnectCharacter()
+    FEnabled = false
+    StopFly()
 end)
 
-print("[FUSION BRAINROT V9] LOADED")
+print("[FUSION BRAINROT V11 VUELO] LOADED")
