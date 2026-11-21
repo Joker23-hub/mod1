@@ -1,6 +1,5 @@
 --==================================================
--- V11 VUELO / HOVER (BLOQUE AÑADIDO)
--- NO MODIFICA NADA DE LO ANTERIOR
+-- V11.1 VUELO / HOVER (CORREGIDO)
 --==================================================
 
 local FEnabled = false
@@ -9,6 +8,8 @@ local FForward, FBack, FLeft, FRight = false, false, false, false
 local FUp, FDown = false, false
 local FConn
 local FBody
+local FAttach
+local FLastHrp
 
 local FGui = Instance.new("ScreenGui")
 FGui.Name = "FusionBrainrotFly"
@@ -23,8 +24,8 @@ if not fok or not FGui.Parent then
 end
 
 local FMain = Instance.new("Frame")
-FMain.Size = UDim2.fromOffset(190, 232)
-FMain.Position = UDim2.new(0.5, 135, 0.62, 0)
+FMain.Size = UDim2.fromOffset(190, 250)
+FMain.Position = UDim2.new(0, 10, 0.52, 0)
 FMain.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
 FMain.BorderSizePixel = 0
 FMain.Active = true
@@ -40,7 +41,7 @@ local FTitle = Instance.new("TextLabel")
 FTitle.Size = UDim2.new(1, -34, 0, 32)
 FTitle.Position = UDim2.fromOffset(5, 0)
 FTitle.BackgroundTransparency = 1
-FTitle.Text = "VUELO V11"
+FTitle.Text = "VUELO V11.1"
 FTitle.TextColor3 = Color3.fromRGB(190, 0, 255)
 FTitle.TextSize = 13
 FTitle.Font = Enum.Font.GothamBold
@@ -81,9 +82,19 @@ local function FButton(text, x, y, w, h, size)
     return b
 end
 
+local FStatus = Instance.new("TextLabel")
+FStatus.Position = UDim2.fromOffset(5, 0)
+FStatus.Size = UDim2.new(1, -10, 0, 16)
+FStatus.BackgroundTransparency = 1
+FStatus.Text = "ESTADO: APAGADO"
+FStatus.TextColor3 = Color3.fromRGB(255, 90, 90)
+FStatus.Font = Enum.Font.GothamBold
+FStatus.TextSize = 11
+FStatus.Parent = FContent
+
 local FSpeedLabel = Instance.new("TextLabel")
-FSpeedLabel.Position = UDim2.fromOffset(5, 2)
-FSpeedLabel.Size = UDim2.new(1, -10, 0, 18)
+FSpeedLabel.Position = UDim2.fromOffset(5, 18)
+FSpeedLabel.Size = UDim2.new(1, -10, 0, 16)
 FSpeedLabel.BackgroundTransparency = 1
 FSpeedLabel.Text = "VELOCIDAD: " .. FSpeed
 FSpeedLabel.TextColor3 = Color3.new(1, 1, 1)
@@ -91,19 +102,70 @@ FSpeedLabel.Font = Enum.Font.GothamBold
 FSpeedLabel.TextSize = 12
 FSpeedLabel.Parent = FContent
 
-local FSMinus = FButton("-", 15, 24, 50, 26)
-local FSPlus = FButton("+", 125, 24, 50, 26)
+local FSMinus = FButton("-", 15, 38, 50, 26)
+local FSPlus = FButton("+", 125, 38, 50, 26)
 
-local FLeftBtn = FButton("<<", 15, 58, 50, 38)
-local FUpBtn = FButton("^", 70, 58, 50, 38)
-local FRightBtn = FButton(">>", 125, 58, 50, 38)
-local FDownBtn = FButton("v", 70, 100, 50, 38)
+local FLeftBtn = FButton("<<", 15, 72, 50, 38)
+local FUpBtn = FButton("^", 70, 72, 50, 38)
+local FRightBtn = FButton(">>", 125, 72, 50, 38)
+local FDownBtn = FButton("v", 70, 114, 50, 38)
 
-local FAltUp = FButton("SUBIR", 15, 100, 50, 38, 11)
-local FAltDown = FButton("BAJAR", 125, 100, 50, 38, 11)
+local FAltUp = FButton("SUBIR", 15, 114, 50, 38, 11)
+local FAltDown = FButton("BAJAR", 125, 114, 50, 38, 11)
 
-local FHold = FButton("HOVER", 15, 144, 160, 28, 12)
-local FToggle = FButton("ACTIVAR VUELO", 15, 178, 160, 30, 12)
+local FHold = FButton("HOVER", 15, 158, 160, 28, 12)
+local FToggle = FButton("ACTIVAR VUELO", 15, 192, 160, 30, 12)
+
+--==================================================
+-- CUERPO
+--==================================================
+
+local function DestroyBody()
+
+    if FBody then
+        pcall(function() FBody:Destroy() end)
+        FBody = nil
+    end
+
+    if FAttach then
+        pcall(function() FAttach:Destroy() end)
+        FAttach = nil
+    end
+end
+
+local function CreateBody(hrp)
+
+    DestroyBody()
+
+    local made = pcall(function()
+
+        local att = Instance.new("Attachment")
+        att.Parent = hrp
+
+        local lv = Instance.new("LinearVelocity")
+        lv.Attachment0 = att
+        lv.RelativeTo = Enum.ActuatorRelativeTo.World
+        lv.ForceLimitMode = Enum.ForceLimitMode.Magnitude
+        lv.MaxForce = 1e6
+        lv.Velocity = Vector3.zero
+        lv.Parent = hrp
+
+        FAttach = att
+        FBody = lv
+    end)
+
+    if not made or not FBody then
+
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "FusionFly"
+        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+        bv.P = 1250
+        bv.Velocity = Vector3.zero
+        bv.Parent = hrp
+
+        FBody = bv
+    end
+end
 
 --==================================================
 -- MOTOR
@@ -123,27 +185,51 @@ local function StopFly()
         FConn = nil
     end
 
-    if FBody then
-        pcall(function() FBody:Destroy() end)
-        FBody = nil
-    end
-
+    DestroyBody()
     ClearInput()
+
+    FLastHrp = nil
+
+    local hum = Humanoid
+
+    if hum and hum.Health > 0 then
+        pcall(function()
+            hum.PlatformStand = false
+        end)
+    end
 end
 
 local function FlyStep()
 
-    local hrp = Root()
+    if not FEnabled then return end
+
     local hum = Humanoid
+    local hrp = Root()
 
     if not hrp or not hum or hum.Health <= 0 then
 
-        if FBody and not hrp then
-            StopFly()
-        end
+        FStatus.Text = "ESTADO: SIN PERSONAJE"
+        FStatus.TextColor3 = Color3.fromRGB(255, 170, 0)
+
+        DestroyBody()
+        FLastHrp = nil
 
         return
     end
+
+    if hrp ~= FLastHrp or not FBody or FBody.Parent ~= hrp then
+        CreateBody(hrp)
+        FLastHrp = hrp
+    end
+
+    if not FBody then
+        FStatus.Text = "ESTADO: SIN CUERPO"
+        return
+    end
+
+    pcall(function()
+        hum.PlatformStand = true
+    end)
 
     local cam = workspace.CurrentCamera
     if not cam then return end
@@ -179,37 +265,26 @@ local function FlyStep()
 
     if dir.Magnitude > 0 then
         dir = dir.Unit * FSpeed
+        FStatus.Text = "ESTADO: MOVIENDO"
+        FStatus.TextColor3 = Color3.fromRGB(0, 255, 130)
+    else
+        FStatus.Text = "ESTADO: HOVER"
+        FStatus.TextColor3 = Color3.fromRGB(0, 200, 255)
     end
 
-    if FBody then
-        FBody.Velocity = dir
-    end
+    FBody.Velocity = dir
 end
 
 local function StartFly()
-
-    local hrp = Root()
-    if not hrp then return end
-
-    if FBody then
-        pcall(function() FBody:Destroy() end)
-        FBody = nil
-    end
-
-    local body = Instance.new("BodyVelocity")
-    body.Name = "FusionFly"
-    body.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    body.P = 1250
-    body.Velocity = Vector3.zero
-    body.Parent = hrp
-
-    FBody = body
 
     if FConn then
         FConn:Disconnect()
     end
 
     FConn = RunService.RenderStepped:Connect(FlyStep)
+
+    FStatus.Text = "ESTADO: ACTIVO"
+    FStatus.TextColor3 = Color3.fromRGB(0, 255, 130)
 end
 
 local function BindHold(button, flag)
@@ -231,8 +306,7 @@ local function BindHold(button, flag)
     end)
 end
 
-BindHold(FForward and FUpBtn or FUpBtn, function(v) FForward = v end)
-
+BindHold(FUpBtn, function(v) FForward = v end)
 BindHold(FLeftBtn, function(v) FLeft = v end)
 BindHold(FRightBtn, function(v) FRight = v end)
 BindHold(FDownBtn, function(v) FBack = v end)
@@ -240,17 +314,41 @@ BindHold(FAltUp, function(v) FUp = v end)
 BindHold(FAltDown, function(v) FDown = v end)
 
 --==================================================
+-- TECLADO
+--==================================================
+
+UIS.InputBegan:Connect(function(input, processed)
+
+    if not FEnabled or processed then return end
+
+    if input.KeyCode == Enum.KeyCode.W then FForward = true end
+    if input.KeyCode == Enum.KeyCode.S then FBack = true end
+    if input.KeyCode == Enum.KeyCode.A then FLeft = true end
+    if input.KeyCode == Enum.KeyCode.D then FRight = true end
+    if input.KeyCode == Enum.KeyCode.Space then FUp = true end
+    if input.KeyCode == Enum.KeyCode.LeftControl then FDown = true end
+end)
+
+UIS.InputEnded:Connect(function(input)
+
+    if input.KeyCode == Enum.KeyCode.W then FForward = false end
+    if input.KeyCode == Enum.KeyCode.S then FBack = false end
+    if input.KeyCode == Enum.KeyCode.A then FLeft = false end
+    if input.KeyCode == Enum.KeyCode.D then FRight = false end
+    if input.KeyCode == Enum.KeyCode.Space then FUp = false end
+    if input.KeyCode == Enum.KeyCode.LeftControl then FDown = false end
+end)
+
+--==================================================
 -- BOTONES
 --==================================================
 
 FSMinus.MouseButton1Click:Connect(function()
-
     FSpeed = math.max(5, FSpeed - 5)
     FSpeedLabel.Text = "VELOCIDAD: " .. FSpeed
 end)
 
 FSPlus.MouseButton1Click:Connect(function()
-
     FSpeed = math.min(250, FSpeed + 5)
     FSpeedLabel.Text = "VELOCIDAD: " .. FSpeed
 end)
@@ -276,21 +374,9 @@ FToggle.MouseButton1Click:Connect(function()
 
         FToggle.Text = "ACTIVAR VUELO"
         FToggle.BackgroundColor3 = Color3.fromRGB(110, 0, 160)
-    end
-end)
 
---==================================================
--- RESPAWN
---==================================================
-
-Player.CharacterAdded:Connect(function()
-
-    if not FEnabled then return end
-
-    task.wait(0.4)
-
-    if FEnabled then
-        StartFly()
+        FStatus.Text = "ESTADO: APAGADO"
+        FStatus.TextColor3 = Color3.fromRGB(255, 90, 90)
     end
 end)
 
@@ -310,7 +396,7 @@ FMin.MouseButton1Click:Connect(function()
         FMain.Size = UDim2.fromOffset(190, 32)
         FMin.Text = "+"
     else
-        FMain.Size = UDim2.fromOffset(190, 232)
+        FMain.Size = UDim2.fromOffset(190, 250)
         FMin.Text = "-"
     end
 end)
@@ -362,4 +448,4 @@ FGui.Destroying:Connect(function()
     StopFly()
 end)
 
-print("[FUSION BRAINROT V11 VUELO] LOADED")
+print("[FUSION BRAINROT V11.1 VUELO] LOADED")
