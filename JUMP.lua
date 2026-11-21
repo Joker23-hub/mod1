@@ -1,5 +1,5 @@
 --==================================================
--- V12 VUELO (AUTOSUFICIENTE + DIAGNOSTICO)
+-- V13 VUELO (ANTI-FLAG: RAMPA + SIN PLATFORMSTAND)
 --==================================================
 
 local FPlayer = game:GetService("Players").LocalPlayer
@@ -7,46 +7,39 @@ local FUIS = game:GetService("UserInputService")
 local FRun = game:GetService("RunService")
 
 local FOn = false
-local FSpeed = 45
-local FCFrame = true
+local FSpeed = 25
+local FCFrame = false
+local FPlatform = false
 local FFwd, FBack, FLeft, FRight = false, false, false, false
 local FUp, FDown = false, false
 local FLoop
 local FBody
 local FAttach
-local FWasAnchored = false
+local FApplied = Vector3.zero
 local FCurHrp
 
 local function FGetChar()
-
     local c = FPlayer.Character
     if c and c.Parent then return c end
-
     return nil
 end
 
 local function FGetHum()
-
     local c = FGetChar()
     if not c then return nil end
-
     return c:FindFirstChildOfClass("Humanoid")
 end
 
 local function FGetHrp()
-
     local c = FGetChar()
     if not c then return nil end
-
     local h = c:FindFirstChild("HumanoidRootPart")
-
     if h and h:IsDescendantOf(workspace) then return h end
-
     return nil
 end
 
 local FGui = Instance.new("ScreenGui")
-FGui.Name = "FusionFlyV12"
+FGui.Name = "FusionFlyV13"
 FGui.ResetOnSpawn = false
 FGui.DisplayOrder = 60
 
@@ -59,8 +52,8 @@ if not fok or not FGui.Parent then
 end
 
 local FMain = Instance.new("Frame")
-FMain.Size = UDim2.fromOffset(200, 292)
-FMain.Position = UDim2.new(0, 8, 1, -300)
+FMain.Size = UDim2.fromOffset(200, 330)
+FMain.Position = UDim2.new(0, 8, 1, -338)
 FMain.BackgroundColor3 = Color3.fromRGB(14, 16, 23)
 FMain.BorderSizePixel = 0
 FMain.Active = true
@@ -77,7 +70,7 @@ local FTitle = Instance.new("TextLabel")
 FTitle.Size = UDim2.new(1, -34, 0, 32)
 FTitle.Position = UDim2.fromOffset(5, 0)
 FTitle.BackgroundTransparency = 1
-FTitle.Text = "VUELO V12"
+FTitle.Text = "VUELO V13"
 FTitle.TextColor3 = Color3.fromRGB(190, 0, 255)
 FTitle.TextSize = 13
 FTitle.Font = Enum.Font.GothamBold
@@ -124,9 +117,9 @@ end
 
 local FDiag = Instance.new("TextLabel")
 FDiag.Position = UDim2.fromOffset(5, 0)
-FDiag.Size = UDim2.new(1, -10, 0, 42)
+FDiag.Size = UDim2.new(1, -10, 0, 40)
 FDiag.BackgroundTransparency = 1
-FDiag.Text = "DIAG: esperando"
+FDiag.Text = "DIAG: listo"
 FDiag.TextColor3 = Color3.fromRGB(255, 170, 0)
 FDiag.Font = Enum.Font.GothamBold
 FDiag.TextSize = 10
@@ -136,7 +129,7 @@ FDiag.ZIndex = 6
 FDiag.Parent = FContent
 
 local FSpeedLabel = Instance.new("TextLabel")
-FSpeedLabel.Position = UDim2.fromOffset(5, 44)
+FSpeedLabel.Position = UDim2.fromOffset(5, 42)
 FSpeedLabel.Size = UDim2.new(1, -10, 0, 16)
 FSpeedLabel.BackgroundTransparency = 1
 FSpeedLabel.Text = "VELOCIDAD: " .. FSpeed
@@ -146,21 +139,24 @@ FSpeedLabel.TextSize = 12
 FSpeedLabel.ZIndex = 6
 FSpeedLabel.Parent = FContent
 
-local FSMinus = FButton("-", 15, 62, 55, 26)
-local FSPlus = FButton("+", 130, 62, 55, 26)
+local FSMinus = FButton("-", 15, 60, 55, 26)
+local FSPlus = FButton("+", 130, 60, 55, 26)
 
-local FLeftBtn = FButton("<<", 15, 94, 55, 38)
-local FUpBtn = FButton("^", 72, 94, 55, 38)
-local FRightBtn = FButton(">>", 130, 94, 55, 38)
-local FDownBtn = FButton("v", 72, 136, 55, 38)
+local FLeftBtn = FButton("<<", 15, 92, 55, 38)
+local FUpBtn = FButton("^", 72, 92, 55, 38)
+local FRightBtn = FButton(">>", 130, 92, 55, 38)
+local FDownBtn = FButton("v", 72, 134, 55, 38)
 
-local FAltUp = FButton("SUBIR", 15, 136, 55, 38, 11)
-local FAltDown = FButton("BAJAR", 130, 136, 55, 38, 11)
+local FAltUp = FButton("SUBIR", 15, 134, 55, 38, 11)
+local FAltDown = FButton("BAJAR", 130, 134, 55, 38, 11)
 
-local FHold = FButton("HOVER", 15, 178, 170, 26, 12)
-local FMode = FButton("MODO: CFRAME", 15, 208, 170, 26, 12)
-local FToggle = FButton("ACTIVAR VUELO", 15, 238, 170, 28, 12)
-local FTest = FButton("PROBAR", 15, 268, 170, 20, 11)
+local FHold = FButton("HOVER", 15, 176, 170, 26, 12)
+
+local FMode = FButton("MODO: FISICA", 15, 206, 82, 24, 10)
+local FPlat = FButton("PLATFORM: OFF", 103, 206, 82, 24, 10)
+
+local FToggle = FButton("ACTIVAR VUELO", 15, 234, 170, 28, 12)
+local FTest = FButton("PROBAR", 15, 266, 170, 20, 11)
 
 --==================================================
 -- CUERPO
@@ -191,7 +187,7 @@ local function FCreateBody(hrp)
         local lv = Instance.new("LinearVelocity")
         lv.Attachment0 = att
         lv.RelativeTo = Enum.ActuatorRelativeTo.World
-        lv.MaxForce = 1e6
+        lv.MaxForce = 45000
         lv.Velocity = Vector3.zero
         lv.Parent = hrp
 
@@ -202,8 +198,8 @@ local function FCreateBody(hrp)
     if not made or not FBody then
 
         local bv = Instance.new("BodyVelocity")
-        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-        bv.P = 1250
+        bv.MaxForce = Vector3.new(45000, 45000, 45000)
+        bv.P = 900
         bv.Velocity = Vector3.zero
         bv.Parent = hrp
 
@@ -216,7 +212,6 @@ end
 --==================================================
 
 local function FClearInput()
-
     FFwd, FBack = false, false
     FLeft, FRight = false, false
     FUp, FDown = false, false
@@ -232,18 +227,14 @@ local function FStop()
     FDestroyBody()
     FClearInput()
 
-    local hum = FGetHum()
-    local hrp = FGetHrp()
+    FApplied = Vector3.zero
 
-    if hum and hum.Health > 0 then
+    local hum = FGetHum()
+
+    if hum and hum.Health > 0 and FPlatform then
         pcall(function() hum.PlatformStand = false end)
     end
 
-    if hrp and FWasAnchored then
-        pcall(function() hrp.Anchored = true end)
-    end
-
-    FWasAnchored = false
     FCurHrp = nil
 end
 
@@ -287,41 +278,51 @@ local function FStep(dt)
 
     if hrp ~= FCurHrp then
         FCurHrp = hrp
-        FWasAnchored = hrp.Anchored
-        pcall(function() hrp.Anchored = false end)
         FCreateBody(hrp)
     end
 
-    pcall(function() hum.PlatformStand = true end)
+    if FPlatform then
+        pcall(function() hum.PlatformStand = true end)
+    end
 
-    local dir = FDirection()
+    local target = FDirection()
+
+    local factor = math.min(dt * 9, 1)
+
+    FApplied = FApplied:Lerp(target, factor)
+
+    if target.Magnitude == 0 and FApplied.Magnitude < 0.6 then
+        FApplied = Vector3.zero
+    end
 
     if FCFrame then
 
-        if dir.Magnitude > 0 then
-            hrp.CFrame = hrp.CFrame + dir * dt
+        if FApplied.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + FApplied * dt
         end
 
         pcall(function()
-            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyLinearVelocity = FApplied
         end)
 
     else
 
         if FBody then
-            FBody.Velocity = dir
+            FBody.Velocity = FApplied
         end
     end
 
-    FDiag.Text = "DIAG: OK | modo=" ..
+    FDiag.Text = "DIAG: OK | " ..
         (FCFrame and "CFRAME" or "FISICA") ..
-        " | anclado=" .. tostring(FWasAnchored) ..
-        " | vel=" .. string.format("%.0f", dir.Magnitude)
+        " | plat=" .. tostring(FPlatform) ..
+        " | vel=" .. string.format("%.1f", FApplied.Magnitude)
 end
 
 local function FStart()
 
     if FLoop then FLoop:Disconnect() end
+
+    FApplied = Vector3.zero
 
     FLoop = FRun.RenderStepped:Connect(FStep)
     FDiag.Text = "DIAG: bucle activo"
@@ -363,7 +364,7 @@ FSMinus.MouseButton1Click:Connect(function()
 end)
 
 FSPlus.MouseButton1Click:Connect(function()
-    FSpeed = math.min(250, FSpeed + 5)
+    FSpeed = math.min(150, FSpeed + 5)
     FSpeedLabel.Text = "VELOCIDAD: " .. FSpeed
 end)
 
@@ -376,6 +377,19 @@ FMode.MouseButton1Click:Connect(function()
     FCFrame = not FCFrame
 
     FMode.Text = "MODO: " .. (FCFrame and "CFRAME" or "FISICA")
+end)
+
+FPlat.MouseButton1Click:Connect(function()
+
+    FPlatform = not FPlatform
+
+    FPlat.Text = "PLATFORM: " .. (FPlatform and "ON" or "OFF")
+
+    local hum = FGetHum()
+
+    if hum and hum.Health > 0 and not FPlatform then
+        pcall(function() hum.PlatformStand = false end)
+    end
 end)
 
 FTest.MouseButton1Click:Connect(function()
@@ -392,8 +406,6 @@ FTest.MouseButton1Click:Connect(function()
 
     if hrp then
         table.insert(parts, "anchor=" .. tostring(hrp.Anchored))
-        table.insert(parts, "cam=" ..
-            tostring(workspace.CurrentCamera ~= nil))
     end
 
     FDiag.Text = "DIAG: " .. table.concat(parts, " | ")
@@ -437,7 +449,7 @@ FMin.MouseButton1Click:Connect(function()
         FMain.Size = UDim2.fromOffset(200, 32)
         FMin.Text = "+"
     else
-        FMain.Size = UDim2.fromOffset(200, 292)
+        FMain.Size = UDim2.fromOffset(200, 330)
         FMin.Text = "-"
     end
 end)
@@ -488,4 +500,4 @@ FGui.Destroying:Connect(function()
     FStop()
 end)
 
-print("[FUSION BRAINROT V12 VUELO] LOADED")
+print("[FUSION BRAINROT V13 VUELO] LOADED")
